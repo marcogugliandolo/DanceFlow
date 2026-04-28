@@ -198,7 +198,7 @@ export default function App() {
     return (
       <div className="relative min-h-screen overflow-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
         {/* Fondo Decorativo Login */}
-        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-150">
+        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
           <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-rose-500/15 dark:bg-rose-500/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-fuchsia-600/15 dark:bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000 delay-500" />
         </div>
@@ -295,14 +295,14 @@ export default function App() {
   return (
     <div className="relative min-h-screen overflow-hidden font-sans selection:bg-rose-500/30">
       {/* Fondo Decorativo */}
-      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-150">
+      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/20 blur-[100px] rounded-full pointer-events-none" />
       </div>
 
       {/* Header Flotante */}
       <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-4xl">
-        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 transition-colors gap-3 sm:gap-0">
+        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 gap-3 sm:gap-0">
           
           {/* Fila superior en móvil: Logo + Acciones */}
           <div className="flex items-center justify-between w-full sm:w-auto px-2 sm:px-0">
