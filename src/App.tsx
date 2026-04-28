@@ -18,7 +18,9 @@ import {
   User,
   Lock,
   LogOut,
-  ArrowRight
+  ArrowRight,
+  LayoutDashboard,
+  History
 } from 'lucide-react';
 
 const cardVariants = {
@@ -235,16 +237,16 @@ export default function App() {
       </div>
 
       {/* Header Flotante */}
-      <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-4xl">
+      <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-4xl">
         <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 transition-colors gap-3 sm:gap-0">
           
           {/* Fila superior en móvil: Logo + Acciones */}
-          <div className="flex items-center justify-between w-full sm:w-auto px-1 sm:px-0">
-            <div className="flex items-center gap-3 sm:pl-2">
-              <div className="relative flex items-center justify-center w-11 h-11 rounded-full bg-black shadow-md overflow-hidden border border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center justify-between w-full sm:w-auto px-2 sm:px-0">
+            <div className="flex items-center gap-2 sm:gap-3 sm:pl-2">
+              <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-black shadow-md overflow-hidden border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
                 <img src="/logo.png" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
-                <div className="hidden absolute inset-0 z-10 flex items-center justify-center text-white">
-                  <span className="font-black text-sm tracking-tighter">SSN</span>
+                <div className="hidden absolute inset-0 z-10 flex flex-col items-center justify-center text-white">
+                  <span className="font-black text-xs tracking-tighter leading-none">SSN</span>
                 </div>
               </div>
               <span className="font-bold tracking-tight text-zinc-900 dark:text-white text-lg">
@@ -253,16 +255,16 @@ export default function App() {
             </div>
 
             {/* Acciones en Móvil */}
-            <div className="flex sm:hidden items-center gap-1">
+            <div className="flex sm:hidden items-center gap-1.5">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
               <button
                 onClick={handleLogout}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors tooltip-trigger relative group"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
                 title="Cerrar Sesión"
               >
                 <LogOut className="w-4 h-4" />
@@ -271,23 +273,26 @@ export default function App() {
           </div>
 
           {/* Menú de pestañas */}
-          <div className="flex w-full sm:w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md">
+          <div className="flex w-full sm:w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-2xl sm:rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md">
             {(['dashboard', 'historial'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`relative flex-1 sm:flex-none px-4 sm:px-6 py-2 text-sm font-semibold rounded-full outline-none transition-colors ${
+                className={`relative flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-2 text-sm font-bold sm:font-semibold rounded-xl sm:rounded-full outline-none transition-colors ${
                   activeTab === tab ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
                 }`}
               >
                 {activeTab === tab && (
                   <motion.div
                     layoutId="pill"
-                    className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-full shadow-sm"
+                    className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-xl sm:rounded-full shadow-sm"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
-                <span className="relative z-10 capitalize">{tab}</span>
+                <span className="relative z-10 flex items-center justify-center gap-2 capitalize">
+                  {tab === 'dashboard' ? <LayoutDashboard className="w-4 h-4 sm:hidden" /> : <History className="w-4 h-4 sm:hidden" />}
+                  {tab}
+                </span>
               </button>
             ))}
           </div>
@@ -328,30 +333,30 @@ export default function App() {
               </div>
               
               {/* Bento Grid Stats */}
-              <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <motion.div variants={cardVariants} className="col-span-2 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-100 dark:to-zinc-300 text-white dark:text-zinc-900 rounded-[2rem] p-6 relative overflow-hidden flex flex-col justify-between group shadow-sm">
+              <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <motion.div variants={cardVariants} className="col-span-2 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-100 dark:to-zinc-300 text-white dark:text-zinc-900 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 relative overflow-hidden flex flex-col justify-between group shadow-sm">
                   <div className="absolute right-0 top-0 w-48 h-48 bg-white/5 dark:bg-black/5 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-700 group-hover:scale-125" />
                   <span className="text-sm font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                     <Wallet className="w-4 h-4" /> Ingresos Totales
                   </span>
                   <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black tracking-tighter">{summary.totalRevenue.toFixed(2)}</span>
-                    <span className="text-2xl font-bold text-zinc-500 dark:text-zinc-400">€</span>
+                    <span className="text-4xl sm:text-5xl font-black tracking-tighter">{summary.totalRevenue.toFixed(2)}</span>
+                    <span className="text-xl sm:text-2xl font-bold text-zinc-500 dark:text-zinc-400">€</span>
                   </div>
                 </motion.div>
 
-                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-6 flex flex-col justify-between shadow-sm">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Realizadas
+                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                  <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> Realizadas
                   </span>
-                  <div className="text-4xl font-black mt-4 text-emerald-500">{summary.totalHeld}</div>
+                  <div className="text-3xl sm:text-4xl font-black mt-4 text-emerald-500">{summary.totalHeld}</div>
                 </motion.div>
 
-                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-6 flex flex-col justify-between shadow-sm">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> Canceladas
+                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                  <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" /> Canceladas
                   </span>
-                  <div className="text-4xl font-black mt-4 text-rose-500">{summary.totalCancelled}</div>
+                  <div className="text-3xl sm:text-4xl font-black mt-4 text-rose-500">{summary.totalCancelled}</div>
                 </motion.div>
               </motion.div>
 
@@ -382,25 +387,25 @@ export default function App() {
                         onSubmit={handleAddActivity}
                       >
                         <div className="p-4 mb-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-rose-200/50 dark:border-rose-500/20 rounded-3xl space-y-3">
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-3">
                             <input
                               required placeholder="Estilo (ej. Bachata)" 
                               value={newActName} onChange={e => setNewActName(e.target.value)}
-                              className="flex-1 w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <input
                               required placeholder="Lugar" 
                               value={newActLocation} onChange={e => setNewActLocation(e.target.value)}
-                              className="flex-1 w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-3">
                             <input
                               required type="number" step="0.5" placeholder="Precio (€)" 
                               value={newActPrice} onChange={e => setNewActPrice(e.target.value)}
-                              className="flex-1 w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
-                            <button type="submit" className="px-6 py-3 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all">
+                            <button type="submit" className="w-full sm:w-auto px-8 py-3.5 sm:py-3 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all">
                               Crear
                             </button>
                           </div>
@@ -580,55 +585,65 @@ export default function App() {
                       <motion.div 
                         key={session.id} 
                         variants={cardVariants} 
-                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl hover:border-zinc-300 dark:hover:border-white/10 transition-colors shadow-sm gap-4"
+                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl hover:border-zinc-300 dark:hover:border-white/10 transition-colors shadow-sm gap-4 relative"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
-                            <span className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
-                            <span className="text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{new Date(session.date).getDate()}</span>
+                        <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
+                            <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
+                            <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{new Date(session.date).getDate()}</span>
                           </div>
                           <div>
-                            <h4 className="font-bold text-zinc-900 dark:text-white text-base">
+                            <h4 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base leading-tight">
                               {activity ? activity.name : <span className="text-zinc-400 italic">Desconocida</span>}
                             </h4>
-                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
                               {activity && (
-                                <span className="text-xs font-semibold text-zinc-500 flex items-center">
+                                <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
                                   <MapPin className="w-3 h-3 mr-1" /> {activity.location}
                                 </span>
                               )}
                               
                               {session.status === 'held' && (
-                                <span className="px-2 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizada</span>
+                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizada</span>
                               )}
                               {session.status === 'cancelled_billed' && (
-                                <span className="px-2 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Cobrada</span>
+                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Cobrada</span>
                               )}
                               {session.status === 'cancelled_unbilled' && (
-                                <span className="px-2 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">No Cobrada</span>
+                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">No Cobrada</span>
                               )}
                             </div>
                             {session.justification && (
-                              <p className="text-xs font-medium text-zinc-400 mt-2 flex items-center">
-                                <Info className="w-3 h-3 mr-1" /> {session.justification}
+                              <p className="text-[11px] sm:text-xs font-medium text-zinc-400 mt-1.5 sm:mt-2 flex items-center">
+                                <Info className="w-3 h-3 mr-1 flex-shrink-0" /> <span className="truncate max-w-[180px] sm:max-w-xs">{session.justification}</span>
                               </p>
                             )}
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pl-18 sm:pl-0">
+                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
                           {session.status !== 'cancelled_unbilled' && activity ? (
-                            <div className="text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600">
+                            <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600">
                               +{activity.pricePerClass.toFixed(2)}€
                             </div>
                           ) : (
-                            <div className="text-lg font-black text-zinc-300 dark:text-zinc-700">0.00€</div>
+                            <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700">0.00€</div>
                           )}
+                          
                           <button
                             onClick={() => deleteSession(session.id)}
-                            className="text-xs font-bold text-rose-500 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="text-xs font-bold text-rose-500 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-rose-50 dark:bg-rose-500/10 sm:bg-transparent px-3 py-1.5 sm:px-0 sm:py-0 rounded-lg sm:rounded-none"
                           >
                             Eliminar
+                          </button>
+                        </div>
+                        
+                        <div className="absolute top-4 right-4 sm:hidden">
+                          <button
+                            onClick={() => deleteSession(session.id)}
+                            className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </motion.div>
