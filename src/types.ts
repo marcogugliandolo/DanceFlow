@@ -13,6 +13,7 @@ export interface ClassSession {
   date: string; // YYYY-MM-DD
   status: ClassStatus;
   justification?: string; // Reason for cancellation
+  attendeesCount?: number; // Number of people who attended
 }
 
 export interface SummaryStats {
@@ -20,6 +21,7 @@ export interface SummaryStats {
   totalCancelled: number;
   totalBilled: number; // held + cancelled_billed
   totalRevenue: number;
+  totalAttendees: number;
   activities: Record<string, ActivityStats>;
 }
 
@@ -28,5 +30,6 @@ export interface ActivityStats {
   cancelledBilledCount: number;
   cancelledUnbilledCount: number;
   totalRevenue: number;
+  totalAttendees: number;
   justifications: string[];
 }

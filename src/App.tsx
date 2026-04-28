@@ -71,6 +71,11 @@ export default function App() {
   const [sessionDate, setSessionDate] = useState('');
   const [sessionStatus, setSessionStatus] = useState<ClassStatus>('held');
   const [sessionJustification, setSessionJustification] = useState('');
+  const [sessionAttendees, setSessionAttendees] = useState('');
+
+  const [filterStatus, setFilterStatus] = useState<ClassStatus | 'all'>('all');
+  const [filterDateStart, setFilterDateStart] = useState('');
+  const [filterDateEnd, setFilterDateEnd] = useState('');
 
   useEffect(() => {
     if (isDarkMode) {
@@ -122,11 +127,13 @@ export default function App() {
       date: sessionDate,
       status: sessionStatus,
       justification: sessionStatus !== 'held' ? sessionJustification : undefined,
+      attendeesCount: sessionStatus === 'held' ? (parseInt(sessionAttendees) || 0) : undefined,
     });
     setSessionActId('');
     setSessionDate('');
     setSessionStatus('held');
     setSessionJustification('');
+    setSessionAttendees('');
     alert('¡Clase registrada correctamente!');
   };
 
@@ -333,8 +340,8 @@ export default function App() {
               </div>
               
               {/* Bento Grid Stats */}
-              <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <motion.div variants={cardVariants} className="col-span-2 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-100 dark:to-zinc-300 text-white dark:text-zinc-900 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 relative overflow-hidden flex flex-col justify-between group shadow-sm">
+              <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-6 gap-3 sm:gap-4">
+                <motion.div variants={cardVariants} className="col-span-2 md:col-span-2 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-100 dark:to-zinc-300 text-white dark:text-zinc-900 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 relative overflow-hidden flex flex-col justify-between group shadow-sm">
                   <div className="absolute right-0 top-0 w-48 h-48 bg-white/5 dark:bg-black/5 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-700 group-hover:scale-125" />
                   <span className="text-sm font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                     <Wallet className="w-4 h-4" /> Ingresos Totales
@@ -345,18 +352,37 @@ export default function App() {
                   </div>
                 </motion.div>
 
-                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                <motion.div variants={cardVariants} className="col-span-1 md:col-span-1 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
                   <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> Realizadas
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> Realiz.
                   </span>
                   <div className="text-3xl sm:text-4xl font-black mt-4 text-emerald-500">{summary.totalHeld}</div>
                 </motion.div>
 
-                <motion.div variants={cardVariants} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                <motion.div variants={cardVariants} className="col-span-1 md:col-span-1 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
                   <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" /> Canceladas
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" /> Cancel.
                   </span>
                   <div className="text-3xl sm:text-4xl font-black mt-4 text-rose-500">{summary.totalCancelled}</div>
+                </motion.div>
+
+                <motion.div variants={cardVariants} className="col-span-1 md:col-span-1 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                  <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
+                    <User className="w-3.5 h-3.5 text-fuchsia-500 flex-shrink-0" /> Alumnos
+                  </span>
+                  <div className="text-3xl sm:text-4xl font-black mt-4 text-fuchsia-500">{summary.totalAttendees}</div>
+                </motion.div>
+
+                <motion.div variants={cardVariants} className="col-span-1 md:col-span-1 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between shadow-sm">
+                  <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 leading-tight">
+                    <AudioLines className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" /> Media
+                  </span>
+                  <div className="flex items-baseline gap-0.5 mt-4">
+                    <span className="text-3xl sm:text-4xl font-black text-blue-500">
+                      {summary.totalAttendees > 0 ? (summary.totalRevenue / summary.totalAttendees).toFixed(1) : '0'}
+                    </span>
+                    <span className="text-sm font-bold text-blue-500/50">€</span>
+                  </div>
                 </motion.div>
               </motion.div>
 
@@ -461,6 +487,10 @@ export default function App() {
                                 <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{actStats?.cancelledBilledCount || 0}</div>
                               </div>
                             </div>
+                            <div className="mt-3 flex justify-between items-center text-xs text-zinc-500 font-medium px-1">
+                              <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {actStats?.totalAttendees || 0} alumnos</span>
+                              <span>Media: {actStats?.totalAttendees > 0 ? (actStats.totalRevenue / actStats.totalAttendees).toFixed(2) : '0.00'}€/pers.</span>
+                            </div>
                           </motion.div>
                         );
                       })}
@@ -474,32 +504,37 @@ export default function App() {
                     <CalendarDays className="w-5 h-5 mr-2 text-rose-500" />
                     Registrar Asistencia
                   </h2>
-                  <form onSubmit={handleAddSession} className="space-y-4">
-                    <div>
+                  <form onSubmit={handleAddSession} className="space-y-5">
+                    <div className="relative">
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Actividad</label>
                       <select
                         required
                         value={sessionActId}
                         onChange={(e) => setSessionActId(e.target.value)}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm"
                       >
                         <option value="" disabled hidden>Seleccionar Actividad...</option>
                         {activities.map((a) => (
                           <option key={a.id} value={a.id}>{a.name} - {a.location}</option>
                         ))}
                       </select>
+                      <div className="absolute right-4 top-[3.25rem] pointer-events-none text-zinc-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                      </div>
                     </div>
 
                     <div>
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Fecha de la clase</label>
                       <input
                         type="date"
                         required
                         value={sessionDate}
                         onChange={(e) => setSessionDate(e.target.value)}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-800 dark:text-zinc-100 cursor-text"
+                        className="block w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3.5 sm:py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
                       />
                     </div>
 
-                    <div className="bg-zinc-100/50 dark:bg-zinc-800/50 p-1.5 rounded-[1.25rem] flex flex-col sm:flex-row gap-1">
+                    <div className="bg-zinc-100 dark:bg-zinc-800/80 p-1.5 rounded-[1.25rem] flex flex-col sm:flex-row gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-700/50">
                       <button
                         type="button"
                         onClick={() => setSessionStatus('held')}
@@ -529,22 +564,48 @@ export default function App() {
                       </button>
                     </div>
 
-                    <AnimatePresence>
-                      {sessionStatus !== 'held' && (
+                    <AnimatePresence mode="wait">
+                      {sessionStatus === 'held' && (
                         <motion.div
+                          key="held"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
+                          className="overflow-hidden px-1 -mx-1"
                         >
-                          <input
-                            type="text"
-                            required
-                            placeholder="Motivo (ej. Puente)"
-                            value={sessionJustification}
-                            onChange={(e) => setSessionJustification(e.target.value)}
-                            className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium mt-1 placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
-                          />
+                          <div className="pt-1 pb-1">
+                            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Número de Asistentes</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              placeholder="Ej. 5"
+                              value={sessionAttendees}
+                              onChange={(e) => setSessionAttendees(e.target.value)}
+                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                      {sessionStatus !== 'held' && (
+                        <motion.div
+                          key="other"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden px-1 -mx-1"
+                        >
+                          <div className="pt-1 pb-1">
+                            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Motivo / Justificación</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Ej. Lluvia, profesor enfermo..."
+                              value={sessionJustification}
+                              onChange={(e) => setSessionJustification(e.target.value)}
+                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                            />
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -568,20 +629,91 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="flex items-center justify-between mb-6 px-2">
-                <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Registro</h2>
+              <div className="flex flex-col mb-6 gap-4 px-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Registro</h2>
+                </div>
+                
+                {/* Filters */}
+                <div className="flex flex-col lg:flex-row gap-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 p-3 rounded-2xl shadow-sm">
+                  <div className="flex-1">
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value as any)}
+                      className="w-full bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none appearance-none cursor-pointer"
+                    >
+                      <option value="all">Todos los estados</option>
+                      <option value="held">Realizadas</option>
+                      <option value="cancelled_billed">Canceladas (Se Cobra)</option>
+                      <option value="cancelled_unbilled">Canceladas (No se Cobra)</option>
+                    </select>
+                  </div>
+                  <div className="flex-[2] flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1 flex items-center bg-zinc-100/50 dark:bg-zinc-800/80 rounded-xl px-3 focus-within:ring-2 focus-within:ring-rose-500/50 transition-all">
+                      <span className="text-xs font-bold text-zinc-400 uppercase pr-2">Desde</span>
+                      <input
+                        type="date"
+                        value={filterDateStart}
+                        onChange={(e) => setFilterDateStart(e.target.value)}
+                        className="w-full bg-transparent py-2.5 text-sm font-semibold outline-none text-zinc-700 dark:text-zinc-300 border-none [color-scheme:light] dark:[color-scheme:dark]"
+                      />
+                    </div>
+                    <div className="flex-1 flex items-center bg-zinc-100/50 dark:bg-zinc-800/80 rounded-xl px-3 focus-within:ring-2 focus-within:ring-rose-500/50 transition-all">
+                      <span className="text-xs font-bold text-zinc-400 uppercase pr-2">Hasta</span>
+                      <input
+                        type="date"
+                        value={filterDateEnd}
+                        onChange={(e) => setFilterDateEnd(e.target.value)}
+                        className="w-full bg-transparent py-2.5 text-sm font-semibold outline-none text-zinc-700 dark:text-zinc-300 border-none [color-scheme:light] dark:[color-scheme:dark]"
+                      />
+                    </div>
+                  </div>
+                  { (filterStatus !== 'all' || filterDateStart || filterDateEnd) && (
+                    <button
+                      onClick={() => { setFilterStatus('all'); setFilterDateStart(''); setFilterDateEnd(''); }}
+                      className="px-4 py-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {sessions.length === 0 ? (
-                <div className="bg-white/40 dark:bg-zinc-900/40 rounded-[2rem] border border-dashed border-zinc-300 dark:border-zinc-700 p-16 text-center">
-                  <CalendarDays className="w-12 h-12 text-zinc-300 dark:text-zinc-600 mx-auto mb-4" />
-                  <p className="text-zinc-500 dark:text-zinc-400 font-medium">Aún no hay registros de clases.</p>
-                </div>
-              ) : (
-                <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-3">
-                  {sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(session => {
-                    const activity = activities.find(a => a.id === session.activityId);
-                    return (
+              {(() => {
+                let filteredSessions = sessions;
+                if (filterStatus !== 'all') {
+                  filteredSessions = filteredSessions.filter(s => s.status === filterStatus);
+                }
+                if (filterDateStart) {
+                  filteredSessions = filteredSessions.filter(s => s.date >= filterDateStart);
+                }
+                if (filterDateEnd) {
+                  filteredSessions = filteredSessions.filter(s => s.date <= filterDateEnd);
+                }
+
+                if (sessions.length === 0) {
+                  return (
+                    <div className="bg-white/40 dark:bg-zinc-900/40 rounded-[2rem] border border-dashed border-zinc-300 dark:border-zinc-700 p-16 text-center">
+                      <CalendarDays className="w-12 h-12 text-zinc-300 dark:text-zinc-600 mx-auto mb-4" />
+                      <p className="text-zinc-500 dark:text-zinc-400 font-medium">Aún no hay registros de clases.</p>
+                    </div>
+                  );
+                }
+                
+                if (filteredSessions.length === 0) {
+                  return (
+                    <div className="bg-white/40 dark:bg-zinc-900/40 rounded-[2rem] border border-dashed border-zinc-300 dark:border-zinc-700 p-16 text-center">
+                      <Activity className="w-12 h-12 text-zinc-300 dark:text-zinc-600 mx-auto mb-4" />
+                      <p className="text-zinc-500 dark:text-zinc-400 font-medium">Ninguna clase coincide con los filtros.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-3">
+                    {filteredSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(session => {
+                      const activity = activities.find(a => a.id === session.activityId);
+                      return (
                       <motion.div 
                         key={session.id} 
                         variants={cardVariants} 
@@ -600,6 +732,11 @@ export default function App() {
                               {activity && (
                                 <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
                                   <MapPin className="w-3 h-3 mr-1" /> {activity.location}
+                                </span>
+                              )}
+                              {session.status === 'held' && session.attendeesCount !== undefined && (
+                                <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
+                                  <User className="w-3 h-3 mx-1" /> {session.attendeesCount}
                                 </span>
                               )}
                               
@@ -624,7 +761,7 @@ export default function App() {
                         <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
                           {session.status !== 'cancelled_unbilled' && activity ? (
                             <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600">
-                              +{activity.pricePerClass.toFixed(2)}€
+                              +{session.status === 'held' ? ((session.attendeesCount || 0) * activity.pricePerClass).toFixed(2) : activity.pricePerClass.toFixed(2)}€
                             </div>
                           ) : (
                             <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700">0.00€</div>
@@ -650,7 +787,8 @@ export default function App() {
                     );
                   })}
                 </motion.div>
-              )}
+                );
+              })()}
             </motion.div>
           )}
         </AnimatePresence>

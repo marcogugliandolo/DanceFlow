@@ -45,6 +45,7 @@ export function useDanceStore() {
       totalCancelled: 0,
       totalBilled: 0,
       totalRevenue: 0,
+      totalAttendees: 0,
       activities: {},
     };
 
@@ -55,6 +56,7 @@ export function useDanceStore() {
         cancelledBilledCount: 0,
         cancelledUnbilledCount: 0,
         totalRevenue: 0,
+        totalAttendees: 0,
         justifications: [],
       };
     });
@@ -66,12 +68,16 @@ export function useDanceStore() {
       const actStats = stats.activities[session.activityId];
 
       if (session.status === 'held') {
+        const attendees = session.attendeesCount || 0;
+        const sessionRevenue = attendees * activity.pricePerClass;
         stats.totalHeld++;
         stats.totalBilled++;
-        stats.totalRevenue += activity.pricePerClass;
+        stats.totalRevenue += sessionRevenue;
+        stats.totalAttendees += attendees;
         
         actStats.heldCount++;
-        actStats.totalRevenue += activity.pricePerClass;
+        actStats.totalRevenue += sessionRevenue;
+        actStats.totalAttendees += attendees;
       } else {
         stats.totalCancelled++;
         
