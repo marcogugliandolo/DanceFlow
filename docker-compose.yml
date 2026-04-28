@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  danceflow-app:
+    image: node:20-slim
+    container_name: danceflow_app
+    working_dir: /app
+    ports:
+      - "3010:3000"  # EXTERNO: 3010 | INTERNO: 3000
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+    restart: always
+    command: >
+      /bin/sh -c "
+      echo '--- INICIANDO DESPLIEGUE DANCEFLOW ---' &&
+      
+      echo '1. Instalando dependencias del sistema...' &&
+      apt-get update && apt-get install -y git python3 make g++ &&
+      
+      echo '2. Sincronizando código fuente...' &&
+      if [ ! -d '.git' ]; then
+        git init &&
+        # REEMPLAZA ESTA URL CON LA DE TU NUEVO REPOSITORIO DE GITHUB
+        git remote add origin https://github.com/tu-usuario/tu-repositorio-danceflow.git;
+      fi &&
+      git fetch origin main &&
+      git reset --hard origin/main &&
+      
+      echo '3. Instalando dependencias de Node...' &&
+      npm install --include=dev &&
+      
+      echo '4. Compilando aplicación Vite...' &&
+      npm run build &&
+      
+      echo '5. Iniciando servidor en el puerto 3000...' &&
+      npx serve -s dist -l 3000
+      "
