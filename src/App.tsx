@@ -179,7 +179,7 @@ export default function App() {
                     placeholder="Usuario"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 
@@ -193,7 +193,7 @@ export default function App() {
                     placeholder="Contraseña"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               </div>
@@ -391,19 +391,19 @@ export default function App() {
                             <input
                               required placeholder="Estilo (ej. Bachata)" 
                               value={newActName} onChange={e => setNewActName(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <input
                               required placeholder="Lugar" 
                               value={newActLocation} onChange={e => setNewActLocation(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                           </div>
                           <div className="flex flex-col sm:flex-row gap-3">
                             <input
                               required type="number" step="0.5" placeholder="Precio (€)" 
                               value={newActPrice} onChange={e => setNewActPrice(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <button type="submit" className="w-full sm:w-auto px-8 py-3.5 sm:py-3 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all">
                               Crear
@@ -480,7 +480,7 @@ export default function App() {
                         required
                         value={sessionActId}
                         onChange={(e) => setSessionActId(e.target.value)}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100"
+                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100"
                       >
                         <option value="" disabled hidden>Seleccionar Actividad...</option>
                         {activities.map((a) => (
@@ -495,7 +495,7 @@ export default function App() {
                         required
                         value={sessionDate}
                         onChange={(e) => setSessionDate(e.target.value)}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-800 dark:text-zinc-100 cursor-text"
+                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-800 dark:text-zinc-100 cursor-text"
                       />
                     </div>
 
@@ -543,7 +543,7 @@ export default function App() {
                             placeholder="Motivo (ej. Puente)"
                             value={sessionJustification}
                             onChange={(e) => setSessionJustification(e.target.value)}
-                            className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium mt-1 placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                            className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium mt-1 placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                           />
                         </motion.div>
                       )}
