@@ -219,7 +219,7 @@ export default function App() {
           <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-white/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-rose-500/10">
             <div className="flex flex-col items-center mb-10">
               <div className="relative flex items-center justify-center w-28 h-28 rounded-full bg-black shadow-xl shadow-black/20 overflow-hidden mb-4 border-[3px] border-zinc-200 dark:border-zinc-800">
-                <img src="/logo.png" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative bg-black" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                <img src="https://nube.marcogugliandolo.com/s/2pxFTzgMRb2nATb/download" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative bg-black" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
                 <div className="hidden absolute inset-0 z-10 flex flex-col items-center justify-center text-white">
                   <span className="font-black text-4xl tracking-tighter leading-none">SSN</span>
                   <span className="text-[7px] uppercase tracking-widest mt-1">SalsaNova</span>
@@ -308,7 +308,7 @@ export default function App() {
           <div className="flex items-center justify-between w-full sm:w-auto px-2 sm:px-0">
             <div className="flex items-center gap-2 sm:gap-3 sm:pl-2">
               <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-black shadow-md overflow-hidden border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
-                <img src="/logo.png" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative bg-black" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                <img src="https://nube.marcogugliandolo.com/s/2pxFTzgMRb2nATb/download" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative bg-black" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
                 <div className="hidden absolute inset-0 z-10 flex flex-col items-center justify-center text-white">
                   <span className="font-black text-xs tracking-tighter leading-none">SSN</span>
                 </div>
