@@ -82,7 +82,7 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.toLowerCase() === 'anita' && password === 'danceflow2026') {
+    if (username.toLowerCase() === 'ana' && password === 'salsanova') {
       setIsAuthenticated(true);
       localStorage.setItem('auth_danceflow', 'true');
       setLoginError(false);
@@ -152,13 +152,17 @@ export default function App() {
         >
           <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-white/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-rose-500/10">
             <div className="flex flex-col items-center mb-10">
-              <div className="relative flex items-center justify-center w-16 h-16 rounded-[20px] bg-gradient-to-tr from-rose-500 to-fuchsia-600 shadow-xl shadow-rose-500/20 overflow-hidden mb-4">
-                <AudioLines className="text-white w-8 h-8 relative z-10" />
+              <div className="relative flex items-center justify-center w-28 h-28 rounded-full bg-black shadow-xl shadow-black/20 overflow-hidden mb-4 border-[3px] border-zinc-200 dark:border-zinc-800">
+                <img src="/logo.png" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                <div className="hidden absolute inset-0 z-10 flex flex-col items-center justify-center text-white">
+                  <span className="font-black text-4xl tracking-tighter leading-none">SSN</span>
+                  <span className="text-[7px] uppercase tracking-widest mt-1">SalsaNova</span>
+                </div>
               </div>
-              <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
-                Dance<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Flow</span>
+              <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white mt-2">
+                Salsa<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Nova</span>
               </h1>
-              <p className="text-zinc-500 text-sm font-medium mt-2">Inicia sesión para gestionar tus clases</p>
+              <p className="text-zinc-500 text-sm font-medium mt-2">Escuela de Baile • Panel de Gestión</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
@@ -237,11 +241,14 @@ export default function App() {
           {/* Fila superior en móvil: Logo + Acciones */}
           <div className="flex items-center justify-between w-full sm:w-auto px-1 sm:px-0">
             <div className="flex items-center gap-3 sm:pl-2">
-              <div className="relative flex items-center justify-center w-10 h-10 rounded-[14px] bg-gradient-to-tr from-rose-500 to-fuchsia-600 shadow-md overflow-hidden">
-                <AudioLines className="text-white w-5 h-5 relative z-10" />
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full bg-black shadow-md overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                <img src="/logo.png" alt="SalsaNova Logo" className="w-full h-full object-cover z-20 relative" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                <div className="hidden absolute inset-0 z-10 flex items-center justify-center text-white">
+                  <span className="font-black text-sm tracking-tighter">SSN</span>
+                </div>
               </div>
               <span className="font-bold tracking-tight text-zinc-900 dark:text-white text-lg">
-                Dance<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Flow</span>
+                Salsa<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Nova</span>
               </span>
             </div>
 
@@ -317,7 +324,7 @@ export default function App() {
               className="space-y-6"
             >
               <div className="flex items-center gap-2 mb-2 px-2">
-                <span className="text-zinc-500 font-medium text-sm">¡Hola de nuevo, <strong className="text-zinc-900 dark:text-white">Anita</strong>! ✨</span>
+                <span className="text-zinc-500 font-medium text-sm">¡Hola de nuevo, <strong className="text-zinc-900 dark:text-white">Ana</strong>! ✨</span>
               </div>
               
               {/* Bento Grid Stats */}
