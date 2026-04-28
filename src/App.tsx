@@ -20,7 +20,10 @@ import {
   LogOut,
   ArrowRight,
   LayoutDashboard,
-  History
+  History,
+  Pencil,
+  X,
+  Save
 } from 'lucide-react';
 
 const cardVariants = {
@@ -50,7 +53,9 @@ export default function App() {
     sessions,
     summary,
     addActivity,
+    editActivity,
     addSession,
+    editSession,
     deleteSession,
     deleteActivity,
   } = useDanceStore();
@@ -67,11 +72,23 @@ export default function App() {
   const [newActLocation, setNewActLocation] = useState('');
   const [newActPrice, setNewActPrice] = useState('');
 
+  const [editingActId, setEditingActId] = useState<string | null>(null);
+  const [editActName, setEditActName] = useState('');
+  const [editActLocation, setEditActLocation] = useState('');
+  const [editActPrice, setEditActPrice] = useState('');
+
   const [sessionActId, setSessionActId] = useState('');
   const [sessionDate, setSessionDate] = useState('');
   const [sessionStatus, setSessionStatus] = useState<ClassStatus>('held');
   const [sessionJustification, setSessionJustification] = useState('');
   const [sessionAttendees, setSessionAttendees] = useState('');
+
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editSessionActId, setEditSessionActId] = useState('');
+  const [editSessionDate, setEditSessionDate] = useState('');
+  const [editSessionStatus, setEditSessionStatus] = useState<ClassStatus>('held');
+  const [editSessionJustification, setEditSessionJustification] = useState('');
+  const [editSessionAttendees, setEditSessionAttendees] = useState('');
 
   const [filterStatus, setFilterStatus] = useState<ClassStatus | 'all'>('all');
   const [filterDateStart, setFilterDateStart] = useState('');
@@ -119,6 +136,24 @@ export default function App() {
     setIsCreatingActivity(false);
   };
 
+  const handleEditActivitySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingActId || !editActName || !editActLocation || !editActPrice) return;
+    editActivity(editingActId, {
+      name: editActName,
+      location: editActLocation,
+      pricePerClass: parseFloat(editActPrice),
+    });
+    setEditingActId(null);
+  };
+
+  const startEditingActivity = (activity: any) => {
+    setEditingActId(activity.id);
+    setEditActName(activity.name);
+    setEditActLocation(activity.location);
+    setEditActPrice(activity.pricePerClass.toString());
+  };
+
   const handleAddSession = (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionActId || !sessionDate) return;
@@ -135,6 +170,28 @@ export default function App() {
     setSessionJustification('');
     setSessionAttendees('');
     alert('¡Clase registrada correctamente!');
+  };
+
+  const handleEditSessionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSessionId || !editSessionActId || !editSessionDate) return;
+    editSession(editingSessionId, {
+      activityId: editSessionActId,
+      date: editSessionDate,
+      status: editSessionStatus,
+      justification: editSessionStatus !== 'held' ? editSessionJustification : undefined,
+      attendeesCount: editSessionStatus === 'held' ? (parseInt(editSessionAttendees) || 0) : undefined,
+    });
+    setEditingSessionId(null);
+  };
+
+  const startEditingSession = (session: any) => {
+    setEditingSessionId(session.id);
+    setEditSessionActId(session.activityId);
+    setEditSessionDate(session.date);
+    setEditSessionStatus(session.status);
+    setEditSessionJustification(session.justification || '');
+    setEditSessionAttendees((session.attendeesCount || 0).toString());
   };
 
   if (!isAuthenticated) {
@@ -451,46 +508,86 @@ export default function App() {
                         const actStats = summary.activities[activity.id];
                         return (
                           <motion.div key={activity.id} variants={cardVariants} className="group bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-5 relative overflow-hidden transition-all hover:border-rose-200 dark:hover:border-rose-500/30 shadow-sm">
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-4 right-4 transition-opacity flex gap-2 sm:opacity-0 sm:group-hover:opacity-100">
+                              <button 
+                                onClick={() => startEditingActivity(activity)}
+                                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 p-2 rounded-full transition-colors shadow-sm"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
                               <button 
                                 onClick={() => deleteActivity(activity.id)}
-                                className="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-500/10 p-2 rounded-full"
+                                className="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-500/10 p-2 rounded-full shadow-sm"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                             
-                            <div className="flex items-center space-x-4 mb-4">
-                              <div className="w-12 h-12 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-700 rounded-[14px] flex items-center justify-center text-zinc-600 dark:text-zinc-300">
-                                <Activity className="w-6 h-6" />
-                              </div>
-                              <div className="pr-10">
-                                <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">{activity.name}</h3>
-                                <p className="text-xs font-semibold text-zinc-500 flex items-center mt-0.5">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {activity.location}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex bg-zinc-100/50 dark:bg-zinc-800/50 rounded-2xl p-3 items-center justify-between">
-                              <div className="text-center px-1 flex-1 border-r border-zinc-200 dark:border-zinc-700">
-                                <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Total</div>
-                                <div className="text-xl font-black text-rose-500">{(actStats?.totalRevenue || 0).toFixed(0)}€</div>
-                              </div>
-                              <div className="text-center px-1 flex-1 border-r border-zinc-200 dark:border-zinc-700">
-                                <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Realiz.</div>
-                                <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{actStats?.heldCount || 0}</div>
-                              </div>
-                              <div className="text-center px-1 flex-1">
-                                <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Cancel.</div>
-                                <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{actStats?.cancelledBilledCount || 0}</div>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex justify-between items-center text-xs text-zinc-500 font-medium px-1">
-                              <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {actStats?.totalAttendees || 0} alumnos</span>
-                              <span>Media: {actStats?.totalAttendees > 0 ? (actStats.totalRevenue / actStats.totalAttendees).toFixed(2) : '0.00'}€/pers.</span>
-                            </div>
+                            {editingActId === activity.id ? (
+                              <form onSubmit={handleEditActivitySubmit} className="space-y-3 pb-2 pt-2">
+                                <div className="flex flex-col gap-2">
+                                  <input
+                                    required placeholder="Estilo (ej. Bachata)" 
+                                    value={editActName} onChange={e => setEditActName(e.target.value)}
+                                    className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                  />
+                                  <div className="flex gap-2">
+                                    <input
+                                      required placeholder="Lugar" 
+                                      value={editActLocation} onChange={e => setEditActLocation(e.target.value)}
+                                      className="flex-[2] bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                    />
+                                    <input
+                                      required type="number" step="0.5" placeholder="Precio (€)" 
+                                      value={editActPrice} onChange={e => setEditActPrice(e.target.value)}
+                                      className="flex-1 min-w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 justify-end mt-2">
+                                  <button type="button" onClick={() => setEditingActId(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1">
+                                    <X className="w-3.5 h-3.5" /> Cancelar
+                                  </button>
+                                  <button type="submit" className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-md shadow-rose-500/20 text-xs font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-1">
+                                    <Save className="w-3.5 h-3.5" /> Guardar
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                <div className="flex items-center space-x-4 mb-4">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-700 rounded-[14px] flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+                                    <Activity className="w-6 h-6" />
+                                  </div>
+                                  <div className="pr-16">
+                                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">{activity.name}</h3>
+                                    <p className="text-xs font-semibold text-zinc-500 flex items-center mt-0.5">
+                                      <MapPin className="w-3 h-3 mr-1" />
+                                      {activity.location} • {activity.pricePerClass.toFixed(2)}€
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex bg-zinc-100/50 dark:bg-zinc-800/50 rounded-2xl p-3 items-center justify-between">
+                                  <div className="text-center px-1 flex-1 border-r border-zinc-200 dark:border-zinc-700">
+                                    <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Total</div>
+                                    <div className="text-xl font-black text-rose-500">{(actStats?.totalRevenue || 0).toFixed(0)}€</div>
+                                  </div>
+                                  <div className="text-center px-1 flex-1 border-r border-zinc-200 dark:border-zinc-700">
+                                    <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Realiz.</div>
+                                    <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{actStats?.heldCount || 0}</div>
+                                  </div>
+                                  <div className="text-center px-1 flex-1">
+                                    <div className="text-xs font-bold tracking-widest text-zinc-400 uppercase mb-1">Cancel.</div>
+                                    <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{actStats?.cancelledBilledCount || 0}</div>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex justify-between items-center text-xs text-zinc-500 font-medium px-1">
+                                  <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {actStats?.totalAttendees || 0} alumnos</span>
+                                  <span>Media: {actStats?.totalAttendees > 0 ? (actStats.totalRevenue / actStats.totalAttendees).toFixed(2) : '0.00'}€/pers.</span>
+                                </div>
+                              </>
+                            )}
                           </motion.div>
                         );
                       })}
@@ -524,13 +621,14 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Fecha de la clase</label>
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Fecha</label>
                       <input
                         type="date"
                         required
                         value={sessionDate}
                         onChange={(e) => setSessionDate(e.target.value)}
-                        className="block w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3.5 sm:py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+                        style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3.5 sm:py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm"
                       />
                     </div>
 
@@ -648,23 +746,25 @@ export default function App() {
                       <option value="cancelled_unbilled">Canceladas (No se Cobra)</option>
                     </select>
                   </div>
-                  <div className="flex-[2] flex flex-col sm:flex-row gap-2">
-                    <div className="flex-1 flex items-center bg-zinc-100/50 dark:bg-zinc-800/80 rounded-xl px-3 focus-within:ring-2 focus-within:ring-rose-500/50 transition-all">
-                      <span className="text-xs font-bold text-zinc-400 uppercase pr-2">Desde</span>
+                  <div className="flex-[2] grid grid-cols-2 gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Desde</span>
                       <input
                         type="date"
                         value={filterDateStart}
                         onChange={(e) => setFilterDateStart(e.target.value)}
-                        className="w-full bg-transparent py-2.5 text-sm font-semibold outline-none text-zinc-700 dark:text-zinc-300 border-none [color-scheme:light] dark:[color-scheme:dark]"
+                        style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
                       />
                     </div>
-                    <div className="flex-1 flex items-center bg-zinc-100/50 dark:bg-zinc-800/80 rounded-xl px-3 focus-within:ring-2 focus-within:ring-rose-500/50 transition-all">
-                      <span className="text-xs font-bold text-zinc-400 uppercase pr-2">Hasta</span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Hasta</span>
                       <input
                         type="date"
                         value={filterDateEnd}
                         onChange={(e) => setFilterDateEnd(e.target.value)}
-                        className="w-full bg-transparent py-2.5 text-sm font-semibold outline-none text-zinc-700 dark:text-zinc-300 border-none [color-scheme:light] dark:[color-scheme:dark]"
+                        style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
                       />
                     </div>
                   </div>
@@ -717,72 +817,134 @@ export default function App() {
                       <motion.div 
                         key={session.id} 
                         variants={cardVariants} 
-                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl hover:border-zinc-300 dark:hover:border-white/10 transition-colors shadow-sm gap-4 relative"
+                        className="group flex flex-col p-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl hover:border-zinc-300 dark:hover:border-white/10 transition-colors shadow-sm gap-4 relative"
                       >
-                        <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
-                          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
-                            <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
-                            <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{new Date(session.date).getDate()}</span>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base leading-tight">
-                              {activity ? activity.name : <span className="text-zinc-400 italic">Desconocida</span>}
-                            </h4>
-                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
-                              {activity && (
-                                <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
-                                  <MapPin className="w-3 h-3 mr-1" /> {activity.location}
-                                </span>
-                              )}
-                              {session.status === 'held' && session.attendeesCount !== undefined && (
-                                <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
-                                  <User className="w-3 h-3 mx-1" /> {session.attendeesCount}
-                                </span>
-                              )}
-                              
-                              {session.status === 'held' && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizada</span>
-                              )}
-                              {session.status === 'cancelled_billed' && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Cobrada</span>
-                              )}
-                              {session.status === 'cancelled_unbilled' && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">No Cobrada</span>
-                              )}
+                        {editingSessionId === session.id ? (
+                          <form onSubmit={handleEditSessionSubmit} className="flex flex-col gap-3">
+                            <div className="flex gap-2">
+                              <select
+                                required
+                                value={editSessionActId}
+                                onChange={(e) => setEditSessionActId(e.target.value)}
+                                className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                              >
+                                <option value="" disabled hidden>Actividad...</option>
+                                {activities.map((a) => (
+                                  <option key={a.id} value={a.id}>{a.name}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="date"
+                                required
+                                value={editSessionDate}
+                                onChange={(e) => setEditSessionDate(e.target.value)}
+                                style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                                className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                              />
                             </div>
-                            {session.justification && (
-                              <p className="text-[11px] sm:text-xs font-medium text-zinc-400 mt-1.5 sm:mt-2 flex items-center">
-                                <Info className="w-3 h-3 mr-1 flex-shrink-0" /> <span className="truncate max-w-[180px] sm:max-w-xs">{session.justification}</span>
-                              </p>
+                            <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl">
+                              <button
+                                type="button" onClick={() => setEditSessionStatus('held')}
+                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}
+                              >Realizada</button>
+                              <button
+                                type="button" onClick={() => setEditSessionStatus('cancelled_billed')}
+                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
+                              >Se Cobra</button>
+                              <button
+                                type="button" onClick={() => setEditSessionStatus('cancelled_unbilled')}
+                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500'}`}
+                              >No se Cobra</button>
+                            </div>
+                            {editSessionStatus === 'held' ? (
+                              <input
+                                type="number" min="0" required placeholder="Nº de Asistentes"
+                                value={editSessionAttendees} onChange={(e) => setEditSessionAttendees(e.target.value)}
+                                className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                              />
+                            ) : (
+                              <input
+                                type="text" required placeholder="Motivo"
+                                value={editSessionJustification} onChange={(e) => setEditSessionJustification(e.target.value)}
+                                className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                              />
                             )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
-                          {session.status !== 'cancelled_unbilled' && activity ? (
-                            <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600">
-                              +{session.status === 'held' ? ((session.attendeesCount || 0) * activity.pricePerClass).toFixed(2) : activity.pricePerClass.toFixed(2)}€
+                            <div className="flex justify-end gap-2 mt-1">
+                              <button type="button" onClick={() => setEditingSessionId(null)} className="px-3 py-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1">
+                                <X className="w-3.5 h-3.5" /> Cancelar
+                              </button>
+                              <button type="submit" className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-md shadow-rose-500/20 text-xs font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-1">
+                                <Save className="w-3.5 h-3.5" /> Guardar
+                              </button>
                             </div>
-                          ) : (
-                            <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700">0.00€</div>
-                          )}
-                          
-                          <button
-                            onClick={() => deleteSession(session.id)}
-                            className="text-xs font-bold text-rose-500 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-rose-50 dark:bg-rose-500/10 sm:bg-transparent px-3 py-1.5 sm:px-0 sm:py-0 rounded-lg sm:rounded-none"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                        
-                        <div className="absolute top-4 right-4 sm:hidden">
-                          <button
-                            onClick={() => deleteSession(session.id)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                          </form>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
+                                <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
+                                <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{new Date(session.date).getDate()}</span>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base leading-tight">
+                                  {activity ? activity.name : <span className="text-zinc-400 italic">Desconocida</span>}
+                                </h4>
+                                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
+                                  {activity && (
+                                    <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
+                                      <MapPin className="w-3 h-3 mr-1" /> {activity.location}
+                                    </span>
+                                  )}
+                                  {session.status === 'held' && session.attendeesCount !== undefined && (
+                                    <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
+                                      <User className="w-3 h-3 mx-1" /> {session.attendeesCount}
+                                    </span>
+                                  )}
+                                  
+                                  {session.status === 'held' && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizada</span>
+                                  )}
+                                  {session.status === 'cancelled_billed' && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Cobrada</span>
+                                  )}
+                                  {session.status === 'cancelled_unbilled' && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">No Cobrada</span>
+                                  )}
+                                </div>
+                                {session.justification && (
+                                  <p className="text-[11px] sm:text-xs font-medium text-zinc-400 mt-1.5 sm:mt-2 flex items-center">
+                                    <Info className="w-3 h-3 mr-1 flex-shrink-0" /> <span className="truncate max-w-[180px] sm:max-w-xs">{session.justification}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between sm:flex-col sm:items-end pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
+                              {session.status !== 'cancelled_unbilled' && activity ? (
+                                <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
+                                  +{session.status === 'held' ? ((session.attendeesCount || 0) * activity.pricePerClass).toFixed(2) : activity.pricePerClass.toFixed(2)}€
+                                </div>
+                              ) : (
+                                <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">0.00€</div>
+                              )}
+                            </div>
+                            
+                            <div className="absolute top-4 right-4 transition-opacity flex gap-2 sm:opacity-0 sm:group-hover:opacity-100">
+                              <button
+                                onClick={() => startEditingSession(session)}
+                                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 p-2 rounded-full transition-colors shadow-sm"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteSession(session.id)}
+                                className="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-500/10 p-2 rounded-full shadow-sm"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })}

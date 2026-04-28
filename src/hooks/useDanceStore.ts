@@ -25,8 +25,20 @@ export function useDanceStore() {
     setActivities((prev) => [...prev, { ...activity, id: crypto.randomUUID() }]);
   };
 
+  const editActivity = (id: string, updatedActivity: Omit<Activity, 'id'>) => {
+    setActivities((prev) =>
+      prev.map((a) => (a.id === id ? { ...updatedActivity, id } : a))
+    );
+  };
+
   const addSession = (session: Omit<ClassSession, 'id'>) => {
     setSessions((prev) => [...prev, { ...session, id: crypto.randomUUID() }]);
+  };
+
+  const editSession = (id: string, updatedSession: Omit<ClassSession, 'id'>) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...updatedSession, id } : s))
+    );
   };
 
   const deleteSession = (id: string) => {
@@ -105,7 +117,9 @@ export function useDanceStore() {
     sessions,
     summary,
     addActivity,
+    editActivity,
     addSession,
+    editSession,
     deleteSession,
     deleteActivity,
   };
