@@ -198,7 +198,7 @@ export default function App() {
     return (
       <div className="relative min-h-screen overflow-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
         {/* Fondo Decorativo Login */}
-        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-500">
+        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-150">
           <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-rose-500/15 dark:bg-rose-500/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-fuchsia-600/15 dark:bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000 delay-500" />
         </div>
@@ -213,7 +213,7 @@ export default function App() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5, type: "spring", bounce: 0.4 }}
+          transition={{ duration: 0.2, type: "spring", bounce: 0.25 }}
           className="w-full max-w-md"
         >
           <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-white/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-rose-500/10">
@@ -295,7 +295,7 @@ export default function App() {
   return (
     <div className="relative min-h-screen overflow-hidden font-sans selection:bg-rose-500/30">
       {/* Fondo Decorativo */}
-      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-500">
+      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] transition-colors duration-150">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/20 blur-[100px] rounded-full pointer-events-none" />
       </div>
@@ -389,7 +389,7 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.15 }}
               className="space-y-6"
             >
               <div className="flex items-center gap-2 mb-2 px-2">
@@ -669,6 +669,7 @@ export default function App() {
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.15 }}
                           className="overflow-hidden px-1 -mx-1"
                         >
                           <div className="pt-1 pb-1">
@@ -691,6 +692,7 @@ export default function App() {
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.15 }}
                           className="overflow-hidden px-1 -mx-1"
                         >
                           <div className="pt-1 pb-1">
@@ -725,7 +727,7 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.15 }}
             >
               <div className="flex flex-col mb-6 gap-4 px-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
