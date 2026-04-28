@@ -27,15 +27,15 @@ import {
 } from 'lucide-react';
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { type: "tween", duration: 0.15, ease: "easeOut" } }
 };
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 }
+    transition: { staggerChildren: 0.02 }
   }
 };
 
@@ -350,7 +350,7 @@ export default function App() {
                   <motion.div
                     layoutId="pill"
                     className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-xl sm:rounded-full shadow-sm"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
                   />
                 )}
                 <span className="relative z-10 flex items-center justify-center gap-2 capitalize">
