@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Activity, ClassSession, SummaryStats, ActivityStats } from '../types';
 
 export function useDanceStore(selectedMonth?: string) {
@@ -20,6 +20,8 @@ export function useDanceStore(selectedMonth?: string) {
     localStorage.setItem('dance_sessions', JSON.stringify(sessions));
   }, [sessions]);
 
+  const isInitialFetch = useRef(true);
+
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
     const fetchData = async () => {
@@ -32,17 +34,24 @@ export function useDanceStore(selectedMonth?: string) {
           const acts = await actRes.json();
           const sess = await sesRes.json();
           
-          // Migrate localStorage if server is empty
-          if (acts.length === 0 && activities.length > 0) {
-             await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(activities)});
-          } else if (acts.length > 0) {
-             setActivities(acts);
-          }
+          // Migrate localStorage if server is empty ONLY on first load
+          if (isInitialFetch.current) {
+            isInitialFetch.current = false;
+            if (acts.length === 0 && activities.length > 0) {
+              await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(activities)});
+            } else {
+              setActivities(acts);
+            }
 
-          if (sess.length === 0 && sessions.length > 0) {
-             await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(sessions)});
-          } else if (sess.length > 0) {
-             setSessions(sess);
+            if (sess.length === 0 && sessions.length > 0) {
+              await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(sessions)});
+            } else {
+              setSessions(sess);
+            }
+          } else {
+            // After initial load, server is always truth
+            setActivities(acts);
+            setSessions(sess);
           }
         }
       } catch (err) {
