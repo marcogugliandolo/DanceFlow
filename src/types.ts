@@ -6,6 +6,7 @@ export interface Activity {
   location: string; // e.g., 'Gimnasio Centro'
   pricePerClass: number; // e.g., 25.50
   paymentType?: 'fixed' | 'monthly';
+  isRecurring?: boolean;
 }
 
 export interface ClassSession {

@@ -76,10 +76,10 @@ export function useDanceStore(selectedMonth?: string) {
         justifications: [],
       };
 
-      // Add monthly fee if they have any sessions in this month
+      // Add monthly fee if they have any sessions in this month, or if it's recurring
       if (act.paymentType === 'monthly') {
         const hasSessions = filteredSessions.some(s => s.activityId === act.id);
-        if (hasSessions) {
+        if (hasSessions || act.isRecurring) {
           stats.activities[act.id].totalRevenue = act.pricePerClass;
           stats.totalRevenue += act.pricePerClass;
         }

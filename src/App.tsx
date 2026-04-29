@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { useDanceStore } from './hooks/useDanceStore';
 import { ClassStatus } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,7 +25,9 @@ import {
   History,
   Pencil,
   X,
-  Save
+  Save,
+  Share2,
+  FileDown
 } from 'lucide-react';
 
 const cardVariants = {
@@ -77,12 +81,14 @@ export default function App() {
   const [newActLocation, setNewActLocation] = useState('');
   const [newActPrice, setNewActPrice] = useState('');
   const [newActPaymentType, setNewActPaymentType] = useState<'fixed' | 'monthly'>('fixed');
+  const [newActIsRecurring, setNewActIsRecurring] = useState(false);
 
   const [editingActId, setEditingActId] = useState<string | null>(null);
   const [editActName, setEditActName] = useState('');
   const [editActLocation, setEditActLocation] = useState('');
   const [editActPrice, setEditActPrice] = useState('');
   const [editActPaymentType, setEditActPaymentType] = useState<'fixed' | 'monthly'>('fixed');
+  const [editActIsRecurring, setEditActIsRecurring] = useState(false);
 
   const [sessionActId, setSessionActId] = useState('');
   const [sessionDate, setSessionDate] = useState('');
@@ -138,11 +144,13 @@ export default function App() {
       location: newActLocation,
       pricePerClass: parseFloat(newActPrice),
       paymentType: newActPaymentType,
+      isRecurring: newActPaymentType === 'monthly' ? newActIsRecurring : false,
     });
     setNewActName('');
     setNewActLocation('');
     setNewActPrice('');
     setNewActPaymentType('fixed');
+    setNewActIsRecurring(false);
     setIsCreatingActivity(false);
   };
 
@@ -154,6 +162,7 @@ export default function App() {
       location: editActLocation,
       pricePerClass: parseFloat(editActPrice),
       paymentType: editActPaymentType,
+      isRecurring: editActPaymentType === 'monthly' ? editActIsRecurring : false,
     });
     setEditingActId(null);
   };
@@ -164,6 +173,7 @@ export default function App() {
     setEditActLocation(activity.location);
     setEditActPrice(activity.pricePerClass.toString());
     setEditActPaymentType(activity.paymentType || 'fixed');
+    setEditActIsRecurring(activity.isRecurring || false);
   };
 
   const handleAddSession = (e: React.FormEvent) => {
@@ -204,6 +214,136 @@ export default function App() {
     setEditSessionStatus(session.status);
     setEditSessionJustification(session.justification || '');
     setEditSessionAttendees((session.attendeesCount || 0).toString());
+  };
+
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    
+    // Header background
+    doc.setFillColor(244, 63, 94); // rose-500
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    // Logo Simulation (Circle)
+    doc.setFillColor(255, 255, 255);
+    doc.circle(20, 20, 8, 'F');
+    doc.setFillColor(244, 63, 94);
+    doc.circle(20, 20, 4, 'F');
+    
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DanceFlow', 35, 23);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Seguimiento corporativo de clases', 35, 30);
+    
+    // Report Title
+    doc.setFontSize(16);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Registro de Sesiones', 14, 55);
+    
+    // Filter summary
+    let filterText = `Periodo: ${filterDateStart || 'Inicio'} - ${filterDateEnd || 'Fin'}`;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(filterText, 14, 62);
+    
+    let filtered = sessions;
+    if (filterStatus !== 'all') filtered = filtered.filter(s => s.status === filterStatus);
+    if (filterDateStart) filtered = filtered.filter(s => s.date >= filterDateStart);
+    if (filterDateEnd) filtered = filtered.filter(s => s.date <= filterDateEnd);
+    
+    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    let totalRevenue = 0;
+    
+    const tableData = filtered.map(s => {
+      const activity = activities.find(a => a.id === s.activityId);
+      let amount = 0;
+      
+      if (activity) {
+        if (activity.paymentType === 'monthly') amount = 0;
+        else if (s.status === 'held') amount = activity.pricePerClass;
+        else if (s.status === 'cancelled_billed') amount = activity.pricePerClass;
+      }
+      
+      totalRevenue += amount;
+      
+      const actName = activity?.name || 'Clase eliminada';
+      const statusStr = s.status === 'held' ? 'Realizada' 
+                      : s.status === 'cancelled_billed' ? 'Cancelada (Cobra)'
+                      : 'Cancelada (No Cobra)';
+                      
+      const revStr = activity?.paymentType === 'monthly' ? 'Mensual' : `${amount.toFixed(2)}€`;
+      
+      return [
+        new Date(s.date).toLocaleDateString(),
+        actName,
+        statusStr,
+        activity?.paymentType === 'monthly' ? '-' : (s.status === 'held' ? (s.attendeesCount?.toString() || '0') : '-'),
+        revStr
+      ];
+    });
+    
+    (doc as any).autoTable({
+      startY: 70,
+      head: [['Fecha', 'Actividad', 'Estado', 'Asistentes', 'Ingreso']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [244, 63, 94], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 10, cellPadding: 4, textColor: [50, 50, 50] },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { top: 70 }
+    });
+    
+    const finalY = (doc as any).lastAutoTable.finalY || 70;
+    
+    const monthlyActs = activities.filter(a => a.paymentType === 'monthly');
+    const monthlyRec = monthlyActs.filter(a => a.isRecurring).reduce((ac, a) => ac + a.pricePerClass, 0);
+    const totalWithMonthly = totalRevenue + monthlyRec;
+
+    // Summary Box
+    doc.setFillColor(245, 245, 247);
+    doc.roundedRect(14, finalY + 10, 182, 35, 3, 3, 'F');
+    
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumen Financiero', 20, finalY + 20);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Ingresos por sesiones individuales: ${totalRevenue.toFixed(2)}€`, 20, finalY + 28);
+    
+    if (monthlyRec > 0) {
+      doc.text(`Cuotas mensuales recurrentes: +${monthlyRec.toFixed(2)}€`, 20, finalY + 34);
+    }
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(244, 63, 94);
+    doc.text(`Total Periodo: ${totalWithMonthly.toFixed(2)}€`, 130, finalY + 34);
+
+    const blob = doc.output('blob');
+    const file = new File([blob], `registro_danceflow_${new Date().getTime()}.pdf`, { type: 'application/pdf' });
+    
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Registro de Clases - DanceFlow',
+          text: 'Se adjunta el reporte de sesiones generado desde DanceFlow.'
+        });
+      } catch (e) {
+        console.log('Error sharing', e);
+        doc.save(`registro_danceflow_${new Date().getTime()}.pdf`);
+      }
+    } else {
+      doc.save(`registro_danceflow_${new Date().getTime()}.pdf`);
+    }
   };
 
   if (!isAuthenticated) {
@@ -520,6 +660,22 @@ export default function App() {
                               Crear
                             </button>
                           </div>
+                          {newActPaymentType === 'monthly' && (
+                            <div className="flex items-center gap-4 px-4 py-3 mt-3 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm cursor-pointer" onClick={() => setNewActIsRecurring(!newActIsRecurring)}>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={newActIsRecurring}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${newActIsRecurring ? 'bg-gradient-to-r from-rose-500 to-fuchsia-600' : 'bg-zinc-200 dark:bg-zinc-700'}`}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${newActIsRecurring ? 'translate-x-6' : 'translate-x-1'}`} />
+                              </button>
+                              <div className="flex flex-col">
+                                <span className="leading-tight text-sm font-bold text-zinc-800 dark:text-zinc-200">Recurrente</span>
+                                <span className="leading-tight text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">Automáticamente suma el ingreso sin registrar sesiones.</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </motion.form>
                     )}
@@ -581,6 +737,20 @@ export default function App() {
                                         className="w-full sm:w-24 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                       />
                                     </div>
+                                    
+                                    {editActPaymentType === 'monthly' && (
+                                      <div className="flex items-center justify-between px-3 py-2.5 mt-2 bg-white dark:bg-zinc-800/80 rounded-xl shadow-sm border border-zinc-200/50 dark:border-zinc-700/50 cursor-pointer" onClick={() => setEditActIsRecurring(!editActIsRecurring)}>
+                                        <span className="leading-tight text-sm font-bold text-zinc-700 dark:text-zinc-300">Recurrente</span>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={editActIsRecurring}
+                                          className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${editActIsRecurring ? 'bg-gradient-to-r from-rose-500 to-fuchsia-600' : 'bg-zinc-200 dark:bg-zinc-700'}`}
+                                        >
+                                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${editActIsRecurring ? 'translate-x-4' : 'translate-x-[2px]'}`} />
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex gap-2 justify-end mt-2">
@@ -602,7 +772,7 @@ export default function App() {
                                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">{activity.name}</h3>
                                     <p className="text-xs font-semibold text-zinc-500 flex items-center mt-0.5">
                                       <MapPin className="w-3 h-3 mr-1" />
-                                      {activity.location} • {activity.paymentType === 'monthly' ? `Cuota mensual: ${activity.pricePerClass.toFixed(2)}€` : `${activity.pricePerClass.toFixed(2)}€ / sesión`}
+                                      {activity.location} • {activity.paymentType === 'monthly' ? `Cuota mensual${activity.isRecurring ? ' (Recurrente)' : ''}: ${activity.pricePerClass.toFixed(2)}€` : `${activity.pricePerClass.toFixed(2)}€ / sesión`}
                                     </p>
                                   </div>
                                 </div>
@@ -773,6 +943,12 @@ export default function App() {
               <div className="flex flex-col mb-6 gap-4 px-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Registro</h2>
+                  <button
+                    onClick={handleExportPDF}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-sm font-bold shadow-md hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <Share2 className="w-4 h-4" /> Exportar / Compartir
+                  </button>
                 </div>
                 
                 {/* Filters */}
@@ -860,10 +1036,18 @@ export default function App() {
                       <motion.div 
                         key={session.id} 
                         variants={cardVariants} 
-                        className="group flex flex-col p-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl hover:border-zinc-300 dark:hover:border-white/10 transition-colors shadow-sm gap-4 relative"
+                        className="relative group rounded-3xl overflow-hidden shadow-sm"
                       >
+                        {!editingSessionId && (
+                          <div className="absolute inset-y-0 right-0 flex items-center justify-end px-4 gap-2 bg-gradient-to-l from-rose-100/50 to-transparent dark:from-rose-900/20 w-full sm:hidden">
+                            <button onClick={() => startEditingSession(session)} className="p-3 bg-white dark:bg-zinc-800 rounded-2xl text-zinc-700 dark:text-zinc-200 shadow-sm transition-all active:scale-95"><Pencil className="w-5 h-5"/></button>
+                            <button onClick={() => deleteSession(session.id)} className="p-3 bg-rose-500 rounded-2xl text-white shadow-sm transition-all active:scale-95"><Trash2 className="w-5 h-5"/></button>
+                          </div>
+                        )}
+                        
                         {editingSessionId === session.id ? (
-                          <form onSubmit={handleEditSessionSubmit} className="flex flex-col gap-3">
+                          <div className="flex flex-col p-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl gap-4">
+                            <form onSubmit={handleEditSessionSubmit} className="flex flex-col gap-3">
                             <div className="flex gap-2">
                               <select
                                 required
@@ -927,8 +1111,14 @@ export default function App() {
                               </button>
                             </div>
                           </form>
+                          </div>
                         ) : (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <motion.div 
+                            drag="x"
+                            dragConstraints={{ left: -120, right: 0 }}
+                            dragElastic={0.1}
+                            className="relative flex flex-col p-4 sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 sm:bg-white/60 sm:dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl z-10 hover:border-zinc-300 dark:hover:border-white/10 transition-colors"
+                          >
                             <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
                               <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
                                 <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
@@ -984,21 +1174,21 @@ export default function App() {
                               )}
                             </div>
                             
-                            <div className="absolute top-4 right-4 transition-opacity flex gap-2 sm:opacity-0 sm:group-hover:opacity-100">
+                            <div className="hidden absolute top-1/2 -translate-y-1/2 right-4 transition-opacity gap-2 sm:flex sm:opacity-0 sm:group-hover:opacity-100">
                               <button
                                 onClick={() => startEditingSession(session)}
-                                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 p-2 rounded-full transition-colors shadow-sm"
+                                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 p-2.5 rounded-2xl transition-all shadow-sm active:scale-95 hover:shadow-md"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => deleteSession(session.id)}
-                                className="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-500/10 p-2 rounded-full shadow-sm"
+                                className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-white bg-rose-50 dark:bg-rose-500/10 p-2.5 rounded-2xl shadow-sm transition-all active:scale-95 hover:shadow-md"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </motion.div>
                     );
