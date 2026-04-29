@@ -5,6 +5,7 @@ export interface Activity {
   name: string; // e.g., 'Latinos'
   location: string; // e.g., 'Gimnasio Centro'
   pricePerClass: number; // e.g., 25.50
+  paymentType?: 'fixed' | 'monthly';
 }
 
 export interface ClassSession {

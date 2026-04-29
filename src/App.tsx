@@ -48,6 +48,11 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
 
+  const [dashboardMonth, setDashboardMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
   const {
     activities,
     sessions,
@@ -58,7 +63,7 @@ export default function App() {
     editSession,
     deleteSession,
     deleteActivity,
-  } = useDanceStore();
+  } = useDanceStore(dashboardMonth);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'historial'>('dashboard');
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -71,11 +76,13 @@ export default function App() {
   const [newActName, setNewActName] = useState('');
   const [newActLocation, setNewActLocation] = useState('');
   const [newActPrice, setNewActPrice] = useState('');
+  const [newActPaymentType, setNewActPaymentType] = useState<'fixed' | 'monthly'>('fixed');
 
   const [editingActId, setEditingActId] = useState<string | null>(null);
   const [editActName, setEditActName] = useState('');
   const [editActLocation, setEditActLocation] = useState('');
   const [editActPrice, setEditActPrice] = useState('');
+  const [editActPaymentType, setEditActPaymentType] = useState<'fixed' | 'monthly'>('fixed');
 
   const [sessionActId, setSessionActId] = useState('');
   const [sessionDate, setSessionDate] = useState('');
@@ -125,14 +132,17 @@ export default function App() {
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newActName || !newActLocation || !newActPrice) return;
+    
     addActivity({
       name: newActName,
       location: newActLocation,
       pricePerClass: parseFloat(newActPrice),
+      paymentType: newActPaymentType,
     });
     setNewActName('');
     setNewActLocation('');
     setNewActPrice('');
+    setNewActPaymentType('fixed');
     setIsCreatingActivity(false);
   };
 
@@ -143,6 +153,7 @@ export default function App() {
       name: editActName,
       location: editActLocation,
       pricePerClass: parseFloat(editActPrice),
+      paymentType: editActPaymentType,
     });
     setEditingActId(null);
   };
@@ -152,6 +163,7 @@ export default function App() {
     setEditActName(activity.name);
     setEditActLocation(activity.location);
     setEditActPrice(activity.pricePerClass.toString());
+    setEditActPaymentType(activity.paymentType || 'fixed');
   };
 
   const handleAddSession = (e: React.FormEvent) => {
@@ -392,8 +404,15 @@ export default function App() {
               transition={{ duration: 0.15 }}
               className="space-y-6"
             >
-              <div className="flex items-center gap-2 mb-2 px-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
                 <span className="text-zinc-500 font-medium text-sm">¡Hola de nuevo, <strong className="text-zinc-900 dark:text-white">Ana</strong>! ✨</span>
+                <input
+                  type="month"
+                  value={dashboardMonth}
+                  onChange={(e) => setDashboardMonth(e.target.value)}
+                  style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                  className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-xl px-4 py-2 text-sm font-bold text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all shadow-sm"
+                />
               </div>
               
               {/* Bento Grid Stats */}
@@ -483,10 +502,19 @@ export default function App() {
                             />
                           </div>
                           <div className="flex flex-col sm:flex-row gap-3">
+                            <select
+                              value={newActPaymentType}
+                              onChange={(e) => setNewActPaymentType(e.target.value as any)}
+                              className="flex-1 min-w-0 w-full sm:w-auto h-[52px] sm:h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium text-zinc-900 dark:text-zinc-100 appearance-none cursor-pointer"
+                            >
+                              <option value="fixed">Sueldo fijo por clase impartida</option>
+                              <option value="monthly">Cuota mensual</option>
+                            </select>
+                            
                             <input
-                              required type="number" step="0.5" placeholder="Precio (€)" 
+                              required type="number" step="0.01" placeholder="Precio (€)" 
                               value={newActPrice} onChange={e => setNewActPrice(e.target.value)}
-                              className="flex-1 min-w-0 w-full sm:w-auto h-[52px] sm:h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="w-full sm:w-32 min-w-0 h-[52px] sm:h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <button type="submit" className="w-full sm:w-auto px-8 h-[52px] sm:h-12 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all">
                               Crear
@@ -537,11 +565,22 @@ export default function App() {
                                       value={editActLocation} onChange={e => setEditActLocation(e.target.value)}
                                       className="flex-[2] min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                     />
-                                    <input
-                                      required type="number" step="0.5" placeholder="Precio (€)" 
-                                      value={editActPrice} onChange={e => setEditActPrice(e.target.value)}
-                                      className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
-                                    />
+                                    <div className="flex flex-col sm:flex-row gap-2 flex-[2] min-w-0">
+                                      <select
+                                        value={editActPaymentType}
+                                        onChange={(e) => setEditActPaymentType(e.target.value as any)}
+                                        className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium text-zinc-900 dark:text-zinc-100 appearance-none cursor-pointer"
+                                      >
+                                        <option value="fixed">Fijo por sesión</option>
+                                        <option value="monthly">Cuota mensual</option>
+                                      </select>
+                                      
+                                      <input
+                                        required type="number" step="0.01" placeholder="Precio (€)" 
+                                        value={editActPrice} onChange={e => setEditActPrice(e.target.value)}
+                                        className="w-full sm:w-24 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex gap-2 justify-end mt-2">
@@ -563,7 +602,7 @@ export default function App() {
                                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">{activity.name}</h3>
                                     <p className="text-xs font-semibold text-zinc-500 flex items-center mt-0.5">
                                       <MapPin className="w-3 h-3 mr-1" />
-                                      {activity.location} • {activity.pricePerClass.toFixed(2)}€
+                                      {activity.location} • {activity.paymentType === 'monthly' ? `Cuota mensual: ${activity.pricePerClass.toFixed(2)}€` : `${activity.pricePerClass.toFixed(2)}€ / sesión`}
                                     </p>
                                   </div>
                                 </div>
@@ -930,10 +969,16 @@ export default function App() {
                             </div>
                             
                             <div className="flex items-center justify-between sm:flex-col sm:items-end pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
-                              {session.status !== 'cancelled_unbilled' && activity ? (
-                                <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
-                                  +{session.status === 'held' ? ((session.attendeesCount || 0) * activity.pricePerClass).toFixed(2) : activity.pricePerClass.toFixed(2)}€
-                                </div>
+                              {activity ? (
+                                activity.paymentType === 'monthly' ? (
+                                  <div className="text-base sm:text-lg font-black text-zinc-400 dark:text-zinc-600 mt-2 sm:mt-0">Mensual</div>
+                                ) : session.status !== 'cancelled_unbilled' ? (
+                                  <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
+                                    +{activity.pricePerClass.toFixed(2)}€
+                                  </div>
+                                ) : (
+                                  <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">0.00€</div>
+                                )
                               ) : (
                                 <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">0.00€</div>
                               )}

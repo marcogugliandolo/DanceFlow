@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Activity, ClassSession, SummaryStats, ActivityStats } from '../types';
 
-export function useDanceStore() {
+export function useDanceStore(selectedMonth?: string) {
   const [activities, setActivities] = useState<Activity[]>(() => {
     const saved = localStorage.getItem('dance_activities');
     return saved ? JSON.parse(saved) : [];
@@ -61,6 +61,10 @@ export function useDanceStore() {
       activities: {},
     };
 
+    const filteredSessions = selectedMonth 
+      ? sessions.filter(s => s.date.startsWith(selectedMonth))
+      : sessions;
+
     // Initialize activities
     activities.forEach((act) => {
       stats.activities[act.id] = {
@@ -71,9 +75,18 @@ export function useDanceStore() {
         totalAttendees: 0,
         justifications: [],
       };
+
+      // Add monthly fee if they have any sessions in this month
+      if (act.paymentType === 'monthly') {
+        const hasSessions = filteredSessions.some(s => s.activityId === act.id);
+        if (hasSessions) {
+          stats.activities[act.id].totalRevenue = act.pricePerClass;
+          stats.totalRevenue += act.pricePerClass;
+        }
+      }
     });
 
-    sessions.forEach((session) => {
+    filteredSessions.forEach((session) => {
       const activity = activities.find((a) => a.id === session.activityId);
       if (!activity) return;
 
@@ -81,7 +94,13 @@ export function useDanceStore() {
 
       if (session.status === 'held') {
         const attendees = session.attendeesCount || 0;
-        const sessionRevenue = attendees * activity.pricePerClass;
+        
+        // Calculate revenue based on payment type
+        let sessionRevenue = 0;
+        if (activity.paymentType !== 'monthly') {
+          sessionRevenue = activity.pricePerClass;
+        }
+        
         stats.totalHeld++;
         stats.totalBilled++;
         stats.totalRevenue += sessionRevenue;
@@ -94,11 +113,16 @@ export function useDanceStore() {
         stats.totalCancelled++;
         
         if (session.status === 'cancelled_billed') {
+          let cancelRevenue = 0;
+          if (activity.paymentType !== 'monthly') {
+             cancelRevenue = activity.pricePerClass;
+          }
+
           stats.totalBilled++;
-          stats.totalRevenue += activity.pricePerClass;
+          stats.totalRevenue += cancelRevenue;
           
           actStats.cancelledBilledCount++;
-          actStats.totalRevenue += activity.pricePerClass;
+          actStats.totalRevenue += cancelRevenue;
         } else {
           actStats.cancelledUnbilledCount++;
         }
@@ -110,7 +134,7 @@ export function useDanceStore() {
     });
 
     return stats;
-  }, [activities, sessions]);
+  }, [activities, sessions, selectedMonth]);
 
   return {
     activities,
