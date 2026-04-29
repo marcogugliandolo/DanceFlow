@@ -196,7 +196,7 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="relative min-h-screen overflow-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
+      <div className="relative min-h-[100dvh] overflow-x-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
         {/* Fondo Decorativo Login */}
         <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
           <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-rose-500/15 dark:bg-rose-500/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000" />
@@ -293,7 +293,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden font-sans selection:bg-rose-500/30">
+    <div className="relative min-h-[100dvh] overflow-x-hidden font-sans selection:bg-rose-500/30">
       {/* Fondo Decorativo */}
       <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
