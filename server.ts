@@ -79,8 +79,8 @@ app.post("/api/activities/:id", (req, res) => {
 });
 
 app.delete("/api/activities/:id", (req, res) => {
-  db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
   db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
+  db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
   res.json({ success: true });
 });
 
