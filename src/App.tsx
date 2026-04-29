@@ -293,7 +293,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden font-sans selection:bg-rose-500/30">
+    <div className="relative w-full min-h-[100dvh] overflow-x-hidden font-sans selection:bg-rose-500/30">
       {/* Fondo Decorativo */}
       <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
@@ -474,19 +474,19 @@ export default function App() {
                             <input
                               required placeholder="Estilo (ej. Bachata)" 
                               value={newActName} onChange={e => setNewActName(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 min-w-0 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <input
                               required placeholder="Lugar" 
                               value={newActLocation} onChange={e => setNewActLocation(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 min-w-0 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                           </div>
                           <div className="flex flex-col sm:flex-row gap-3">
                             <input
                               required type="number" step="0.5" placeholder="Precio (€)" 
                               value={newActPrice} onChange={e => setNewActPrice(e.target.value)}
-                              className="flex-1 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                              className="flex-1 min-w-0 w-full sm:w-auto bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3.5 sm:py-3 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
                             <button type="submit" className="w-full sm:w-auto px-8 py-3.5 sm:py-3 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all">
                               Crear
@@ -529,13 +529,13 @@ export default function App() {
                                   <input
                                     required placeholder="Estilo (ej. Bachata)" 
                                     value={editActName} onChange={e => setEditActName(e.target.value)}
-                                    className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                    className="w-full min-w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                   />
                                   <div className="flex gap-2">
                                     <input
                                       required placeholder="Lugar" 
                                       value={editActLocation} onChange={e => setEditActLocation(e.target.value)}
-                                      className="flex-[2] bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                      className="flex-[2] min-w-0 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                     />
                                     <input
                                       required type="number" step="0.5" placeholder="Precio (€)" 
@@ -608,7 +608,7 @@ export default function App() {
                         required
                         value={sessionActId}
                         onChange={(e) => setSessionActId(e.target.value)}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm"
+                        className="w-full min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm"
                       >
                         <option value="" disabled hidden>Seleccionar Actividad...</option>
                         {activities.map((a) => (
@@ -628,7 +628,7 @@ export default function App() {
                         value={sessionDate}
                         onChange={(e) => setSessionDate(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3.5 sm:py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm"
+                        className="w-full min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3.5 sm:py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm"
                       />
                     </div>
 
@@ -636,7 +636,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSessionStatus('held')}
-                        className={`flex-1 py-3 px-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${
+                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] ${
                           sessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
@@ -645,20 +645,22 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSessionStatus('cancelled_billed')}
-                        className={`flex-1 py-3 px-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${
+                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] leading-tight ${
                           sessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
-                        Se Cobra
+                        <span className="block">No Realizada</span>
+                        <span className="block text-[9px] sm:text-[10px] opacity-80">(Se cobra)</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSessionStatus('cancelled_unbilled')}
-                        className={`flex-1 py-3 px-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${
+                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] leading-tight ${
                           sessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
-                        No se Cobra
+                        <span className="block">No Realizada</span>
+                        <span className="block text-[9px] sm:text-[10px] opacity-80">(No cobra)</span>
                       </button>
                     </div>
 
@@ -681,7 +683,7 @@ export default function App() {
                               placeholder="Ej. 5"
                               value={sessionAttendees}
                               onChange={(e) => setSessionAttendees(e.target.value)}
-                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                              className="w-full min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
                             />
                           </div>
                         </motion.div>
@@ -703,7 +705,7 @@ export default function App() {
                               placeholder="Ej. Lluvia, profesor enfermo..."
                               value={sessionJustification}
                               onChange={(e) => setSessionJustification(e.target.value)}
-                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                              className="w-full min-w-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
                             />
                           </div>
                         </motion.div>
@@ -736,7 +738,7 @@ export default function App() {
                 
                 {/* Filters */}
                 <div className="flex flex-col lg:flex-row gap-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 p-3 rounded-2xl shadow-sm">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value as any)}
@@ -744,11 +746,11 @@ export default function App() {
                     >
                       <option value="all">Todos los estados</option>
                       <option value="held">Realizadas</option>
-                      <option value="cancelled_billed">Canceladas (Se Cobra)</option>
-                      <option value="cancelled_unbilled">Canceladas (No se Cobra)</option>
+                      <option value="cancelled_billed">No Realizadas (Se Cobra)</option>
+                      <option value="cancelled_unbilled">No Realizadas (No se Cobra)</option>
                     </select>
                   </div>
-                  <div className="flex-[2] grid grid-cols-2 gap-2">
+                  <div className="flex-[2] min-w-0 grid grid-cols-2 gap-2">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Desde</span>
                       <input
@@ -756,7 +758,7 @@ export default function App() {
                         value={filterDateStart}
                         onChange={(e) => setFilterDateStart(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
+                        className="w-full min-w-0 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
                       />
                     </div>
                     <div className="flex flex-col">
@@ -766,7 +768,7 @@ export default function App() {
                         value={filterDateEnd}
                         onChange={(e) => setFilterDateEnd(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
+                        className="w-full min-w-0 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 py-2 sm:py-2.5 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
                       />
                     </div>
                   </div>
@@ -847,16 +849,22 @@ export default function App() {
                             <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl">
                               <button
                                 type="button" onClick={() => setEditSessionStatus('held')}
-                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}
+                                className={`flex-1 py-2 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}
                               >Realizada</button>
                               <button
                                 type="button" onClick={() => setEditSessionStatus('cancelled_billed')}
-                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
-                              >Se Cobra</button>
+                                className={`flex-1 py-1 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 leading-tight ${editSessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
+                              >
+                                <span className="block">No Realizada</span>
+                                <span className="block text-[8px] opacity-80">(Se cobra)</span>
+                              </button>
                               <button
                                 type="button" onClick={() => setEditSessionStatus('cancelled_unbilled')}
-                                className={`flex-1 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-all ${editSessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500'}`}
-                              >No se Cobra</button>
+                                className={`flex-1 py-1 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 leading-tight ${editSessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500'}`}
+                              >
+                                <span className="block">No Realizada</span>
+                                <span className="block text-[8px] opacity-80">(No cobra)</span>
+                              </button>
                             </div>
                             {editSessionStatus === 'held' ? (
                               <input
