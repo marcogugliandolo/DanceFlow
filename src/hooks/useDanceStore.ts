@@ -20,34 +20,98 @@ export function useDanceStore(selectedMonth?: string) {
     localStorage.setItem('dance_sessions', JSON.stringify(sessions));
   }, [sessions]);
 
+  // Sync with Backend Server (Data + Telegram integration)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [actRes, sesRes] = await Promise.all([
+          fetch('/api/activities'),
+          fetch('/api/sessions')
+        ]);
+        if (actRes.ok && sesRes.ok) {
+          const acts = await actRes.json();
+          const sess = await sesRes.json();
+          
+          // Migrate localStorage if server is empty
+          if (acts.length === 0 && activities.length > 0) {
+             await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(activities)});
+          } else if (acts.length > 0) {
+             setActivities(acts);
+          }
+
+          if (sess.length === 0 && sessions.length > 0) {
+             await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(sessions)});
+          } else if (sess.length > 0) {
+             setSessions(sess);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch from server", err);
+      }
+    };
+    
+    // Initial fetch
+    fetchData();
+    
+    // Poll the server every 5 seconds to get updates from Telegram bot
+    const intervalId = setInterval(fetchData, 5000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const syncActivity = async (a: Activity) => {
+    try { await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) }); } catch(e) {}
+  };
+
+  const syncSession = async (s: ClassSession) => {
+    try { await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); } catch(e) {}
+  };
+
+  const deleteActivityFromServer = async (id: string) => {
+    try { await fetch(`/api/activities/${id}`, { method: 'DELETE' }); } catch(e) {}
+  };
+
+  const deleteSessionFromServer = async (id: string) => {
+    try { await fetch(`/api/sessions/${id}`, { method: 'DELETE' }); } catch(e) {}
+  };
+
   // Actions
   const addActivity = (activity: Omit<Activity, 'id'>) => {
-    setActivities((prev) => [...prev, { ...activity, id: crypto.randomUUID() }]);
+    const newA = { ...activity, id: crypto.randomUUID() };
+    setActivities((prev) => [...prev, newA]);
+    syncActivity(newA);
   };
 
   const editActivity = (id: string, updatedActivity: Omit<Activity, 'id'>) => {
+    const newA = { ...updatedActivity, id };
     setActivities((prev) =>
-      prev.map((a) => (a.id === id ? { ...updatedActivity, id } : a))
+      prev.map((a) => (a.id === id ? newA : a))
     );
+    syncActivity(newA);
   };
 
   const addSession = (session: Omit<ClassSession, 'id'>) => {
-    setSessions((prev) => [...prev, { ...session, id: crypto.randomUUID() }]);
+    const newS = { ...session, id: crypto.randomUUID() };
+    setSessions((prev) => [...prev, newS]);
+    syncSession(newS);
   };
 
   const editSession = (id: string, updatedSession: Omit<ClassSession, 'id'>) => {
+    const newS = { ...updatedSession, id };
     setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...updatedSession, id } : s))
+      prev.map((s) => (s.id === id ? newS : s))
     );
+    syncSession(newS);
   };
 
   const deleteSession = (id: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== id));
+    deleteSessionFromServer(id);
   };
 
   const deleteActivity = (id: string) => {
     setActivities((prev) => prev.filter((a) => a.id !== id));
     setSessions((prev) => prev.filter((s) => s.activityId !== id));
+    deleteActivityFromServer(id);
   };
 
   // Computations

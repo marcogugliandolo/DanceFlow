@@ -2,28 +2,31 @@ version: '3.8'
 
 services:
   danceflow-app:
-    image: node:20-slim
-    container_name: danceflow_app
+    image: node:22-slim
+    container_name: salsanova_app
     working_dir: /app
     ports:
-      - "3010:3000"  # EXTERNO: 3010 | INTERNO: 3000
+      - "3010:3000"  # EXTERNO: 3010 (puedes cambiarlo) | INTERNO: 3000 (no tocar)
+    volumes:
+      - salsanova_data:/app/data
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} # Token para el Bot
     restart: always
     command: >
       /bin/sh -c "
       echo '--- INICIANDO DESPLIEGUE DANCEFLOW ---' &&
       
       echo '1. Instalando dependencias del sistema...' &&
-      apt-get update && apt-get install -y git python3 make g++ &&
+      apt-get update && apt-get install -y git python3 make g++ sqlite3 &&
       
       echo '2. Sincronizando código fuente...' &&
       if [ ! -d '.git' ]; then
         git init &&
-        # REEMPLAZA ESTA URL CON LA DE TU NUEVO REPOSITORIO DE GITHUB
-        git remote add origin https://github.com/tu-usuario/tu-repositorio-danceflow.git;
+        # ¡IMPORTANTE! REEMPLAZA ESTA URL CON LA DE TU NUEVO REPOSITORIO DE GITHUB:
+        git remote add origin https://github.com/marcogugliandolo/DanceFlow.git;
       fi &&
       git fetch origin main &&
       git reset --hard origin/main &&
@@ -31,9 +34,12 @@ services:
       echo '3. Instalando dependencias de Node...' &&
       npm install --include=dev &&
       
-      echo '4. Compilando aplicación Vite...' &&
+      echo '4. Compilando aplicación...' &&
       npm run build &&
       
-      echo '5. Iniciando servidor en el puerto 3000...' &&
-      npx serve -s dist -l 3000
+      echo '5. Iniciando servidor Node (API + Interfaz Vite + Telegram Bot)...' &&
+      npm start
       "
+
+volumes:
+  salsanova_data:
