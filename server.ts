@@ -3,7 +3,6 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import path from "path";
 import Database from "better-sqlite3";
-import TelegramBot from "node-telegram-bot-api";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
@@ -117,66 +116,57 @@ app.delete("/api/sessions/:id", (req, res) => {
 });
 
 
-// Telegram Bot Setup
-const token = process.env.TELEGRAM_BOT_TOKEN;
-if (token) {
-  const bot = new TelegramBot(token, { polling: true });
-  console.log("Telegram Bot is running...");
-
-  // Match /clase [NombreClase] [asistentes]
-  bot.onText(/\/clase (.+)/, (msg, match) => {
-    const chatId = msg.chat.id;
-    if (!match) return;
-
-    try {
-      const input = match[1].trim();
-      const parts = input.split(' ');
-      
-      // Assume the last part is a number if possible, else it's all class name
-      let className = input;
-      let attendeesCount = 1;
-      let hasAttendees = false;
-
-      if (parts.length > 1) {
-        const lastPart = parts[parts.length - 1];
-        if (!isNaN(parseInt(lastPart))) {
-          attendeesCount = parseInt(lastPart);
-          className = parts.slice(0, -1).join(' ').trim();
-          hasAttendees = true;
-        }
-      }
-
-      // Find activity by name (case insensitive partial match)
-      const activity = db.prepare("SELECT * FROM activities WHERE name LIKE ? LIMIT 1").get(`%${className}%`) as any;
-
-      if (!activity) {
-        bot.sendMessage(chatId, `No pude encontrar una clase que coincida con "${className}". Asegúrate de que exista en el sistema.`);
-        return;
-      }
-
-      // Create a session for today
-      const today = new Date().toISOString().split('T')[0];
-      const sessionId = crypto.randomUUID();
-
-      db.prepare("INSERT INTO class_sessions (id, activityId, date, status, attendeesCount) VALUES (?, ?, ?, ?, ?)")
-        .run(sessionId, activity.id, today, 'held', hasAttendees ? attendeesCount : null);
-
-      bot.sendMessage(chatId, `✅ Clase registrada: *${activity.name}*\n📅 Fecha: ${today}\n👥 Asistentes: ${hasAttendees ? attendeesCount : 'No especificado'}\nEstado: Realizada`, { parse_mode: 'Markdown' });
-      
-    } catch (error) {
-      console.error(error);
-      bot.sendMessage(chatId, "Hubo un error al registrar la clase.");
+// External API para integrar con n8n u otros servicios (similar a Alza.finance)
+app.post("/api/external/clase", express.json(), (req, res) => {
+  try {
+    // Autenticación tipo Bearer Token (Authorization: Bearer <token>)
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+    
+    if (process.env.API_KEY && token !== process.env.API_KEY) {
+      return res.status(401).json({ error: "No autorizado. Verifique su API Key en el encabezado Authorization: Bearer <API_KEY>" });
     }
-  });
-  
-  bot.on("message", (msg) => {
-    if (msg.text && !msg.text.startsWith('/')) {
-      bot.sendMessage(msg.chat.id, "Para registrar una clase, usa el comando:\n`/clase [Nombre] [Asistentes]`\nEjemplo: `/clase Latinos 15`", { parse_mode: 'Markdown' });
+
+    const { className, attendeesCount, date, status, justification } = req.body;
+
+    if (!className) {
+      return res.status(400).json({ error: "El campo 'className' es obligatorio para asociar la clase." });
     }
-  });
-} else {
-  console.log("No TELEGRAM_BOT_TOKEN provided. Telegram integration disabled.");
-}
+
+    // Buscar actividad por nombre (coincidencia parcial)
+    const activity = db.prepare("SELECT * FROM activities WHERE name LIKE ? LIMIT 1").get(`%${className}%`) as any;
+
+    if (!activity) {
+      return res.status(404).json({ error: `No pude encontrar una clase (actividad) que coincida con "${className}".` });
+    }
+
+    // Create session (use provided date or today)
+    const sessionDate = date || new Date().toISOString().split('T')[0];
+    const sessionId = crypto.randomUUID();
+    const sessionStatus = status || 'held';
+
+    db.prepare("INSERT INTO class_sessions (id, activityId, date, status, attendeesCount, justification) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(sessionId, activity.id, sessionDate, sessionStatus, attendeesCount || null, justification || null);
+
+    res.json({
+      success: true,
+      message: `Clase externa registrada: ${activity.name}`,
+      data: {
+        id: sessionId,
+        activityId: activity.id,
+        activityName: activity.name,
+        date: sessionDate,
+        status: sessionStatus,
+        attendeesCount: attendeesCount || 'No especificado',
+        justification: justification || null
+      }
+    });
+
+  } catch (error) {
+    console.error("Error en API Externa:", error);
+    res.status(500).json({ error: "Error interno del servidor al registrar la clase externa" });
+  }
+});
 
 // Start Server
 async function startServer() {
