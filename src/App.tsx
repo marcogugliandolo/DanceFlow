@@ -947,7 +947,8 @@ export default function App() {
                 
                 {/* Filters */}
                 <div className="flex flex-col lg:flex-row gap-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 p-3 rounded-2xl shadow-sm">
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1 truncate">Estado</span>
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value as any)}
