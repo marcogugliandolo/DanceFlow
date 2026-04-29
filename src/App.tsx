@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { useDanceStore } from './hooks/useDanceStore';
 import { ClassStatus } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -288,7 +288,7 @@ export default function App() {
       ];
     });
     
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 70,
       head: [['Fecha', 'Actividad', 'Estado', 'Asistentes', 'Ingreso']],
       body: tableData,
