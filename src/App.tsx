@@ -620,15 +620,15 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Fecha</label>
+                    <div className="flex flex-col min-w-0">
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2 truncate">Fecha</label>
                       <input
                         type="date"
                         required
                         value={sessionDate}
                         onChange={(e) => setSessionDate(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm"
+                        className="w-full max-w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm appearance-none"
                       />
                     </div>
 
@@ -750,25 +750,25 @@ export default function App() {
                       <option value="cancelled_unbilled">No Realizadas (No se Cobra)</option>
                     </select>
                   </div>
-                  <div className="flex-[2] min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Desde</span>
+                  <div className="flex-[2] min-w-0 flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1 truncate">Desde</span>
                       <input
                         type="date"
                         value={filterDateStart}
                         onChange={(e) => setFilterDateStart(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
+                        className="w-full max-w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block appearance-none"
                       />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Hasta</span>
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1 truncate">Hasta</span>
                       <input
                         type="date"
                         value={filterDateEnd}
                         onChange={(e) => setFilterDateEnd(e.target.value)}
                         style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                        className="w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block"
+                        className="w-full max-w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none m-0 block appearance-none"
                       />
                     </div>
                   </div>
@@ -843,7 +843,7 @@ export default function App() {
                                 value={editSessionDate}
                                 onChange={(e) => setEditSessionDate(e.target.value)}
                                 style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                                className="w-full h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                                className="w-full max-w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100 appearance-none overflow-hidden text-ellipsis"
                               />
                             </div>
                             <div className="flex flex-col sm:flex-row bg-zinc-100 dark:bg-zinc-800/80 p-1 gap-1 rounded-xl">

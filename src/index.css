@@ -8,6 +8,21 @@
     width: 100%;
   }
 
+  /* Fix for iOS date inputs rendering weirdly or clipping */
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+  }
+  
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.5em;
+  }
+
   :root {
     --bg-light: #f4f4f5; /* zinc-100 */
     --bg-dark: #09090b; /* zinc-950 */
