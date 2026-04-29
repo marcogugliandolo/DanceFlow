@@ -225,16 +225,12 @@ export default function App() {
     doc.rect(0, 0, 210, 40, 'F');
     
     // Logo
-    doc.addImage(logoBase64, 'JPEG', 14, 10, 20, 20);
-    
-    doc.setFontSize(24);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SalsaNova', 38, 23);
+    doc.addImage(logoBase64, 'PNG', 14, 10, 45, 19);
     
     doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'normal');
-    doc.text('Seguimiento corporativo de clases', 38, 30);
+    doc.text('Seguimiento corporativo de clases', 196, 25, { align: 'right' });
     
     // Report Title
     doc.setFontSize(16);
