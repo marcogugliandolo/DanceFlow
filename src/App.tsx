@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import logoBase64 from './logo';
 import { useDanceStore } from './hooks/useDanceStore';
 import { ClassStatus } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -223,20 +224,17 @@ export default function App() {
     doc.setFillColor(244, 63, 94); // rose-500
     doc.rect(0, 0, 210, 40, 'F');
     
-    // Logo Simulation (Circle)
-    doc.setFillColor(255, 255, 255);
-    doc.circle(20, 20, 8, 'F');
-    doc.setFillColor(244, 63, 94);
-    doc.circle(20, 20, 4, 'F');
+    // Logo
+    doc.addImage(logoBase64, 'JPEG', 14, 10, 20, 20);
     
     doc.setFontSize(24);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('DanceFlow', 35, 23);
+    doc.text('SalsaNova', 38, 23);
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text('Seguimiento corporativo de clases', 35, 30);
+    doc.text('Seguimiento corporativo de clases', 38, 30);
     
     // Report Title
     doc.setFontSize(16);
@@ -328,21 +326,21 @@ export default function App() {
     doc.text(`Total Periodo: ${totalWithMonthly.toFixed(2)}€`, 130, finalY + 34);
 
     const blob = doc.output('blob');
-    const file = new File([blob], `registro_danceflow_${new Date().getTime()}.pdf`, { type: 'application/pdf' });
+    const file = new File([blob], `registro_salsanova_${new Date().getTime()}.pdf`, { type: 'application/pdf' });
     
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
-          title: 'Registro de Clases - DanceFlow',
-          text: 'Se adjunta el reporte de sesiones generado desde DanceFlow.'
+          title: 'Registro de Clases - SalsaNova',
+          text: 'Se adjunta el reporte de sesiones generado desde SalsaNova.'
         });
       } catch (e) {
         console.log('Error sharing', e);
-        doc.save(`registro_danceflow_${new Date().getTime()}.pdf`);
+        doc.save(`registro_salsanova_${new Date().getTime()}.pdf`);
       }
     } else {
-      doc.save(`registro_danceflow_${new Date().getTime()}.pdf`);
+      doc.save(`registro_salsanova_${new Date().getTime()}.pdf`);
     }
   };
 
