@@ -2,6 +2,12 @@
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
+  html, body {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+
   :root {
     --bg-light: #f4f4f5; /* zinc-100 */
     --bg-dark: #09090b; /* zinc-950 */

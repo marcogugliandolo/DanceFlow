@@ -198,7 +198,7 @@ export default function App() {
     return (
       <div className="relative min-h-[100dvh] overflow-x-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
         {/* Fondo Decorativo Login */}
-        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
+        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] overflow-hidden">
           <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-rose-500/15 dark:bg-rose-500/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-fuchsia-600/15 dark:bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000 delay-500" />
         </div>
@@ -295,13 +295,13 @@ export default function App() {
   return (
     <div className="relative w-full min-h-[100dvh] overflow-x-hidden font-sans selection:bg-rose-500/30">
       {/* Fondo Decorativo */}
-      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b]">
+      <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/20 blur-[100px] rounded-full pointer-events-none" />
       </div>
 
       {/* Header Flotante */}
-      <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-4xl">
+      <header className="fixed top-3 inset-x-0 mx-auto z-50 w-[96%] max-w-4xl">
         <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 gap-3 sm:gap-0">
           
           {/* Fila superior en móvil: Logo + Acciones */}
@@ -608,7 +608,7 @@ export default function App() {
                         required
                         value={sessionActId}
                         onChange={(e) => setSessionActId(e.target.value)}
-                        className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm"
+                        className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm overflow-hidden text-ellipsis"
                       >
                         <option value="" disabled hidden>Seleccionar Actividad...</option>
                         {activities.map((a) => (
@@ -632,7 +632,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="bg-zinc-100 dark:bg-zinc-800/80 p-1.5 rounded-[1.25rem] flex flex-row gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-700/50">
+                    <div className="bg-zinc-100 dark:bg-zinc-800/80 p-1.5 rounded-[1.25rem] flex flex-col sm:flex-row gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-700/50">
                       <button
                         type="button"
                         onClick={() => setSessionStatus('held')}
@@ -742,7 +742,7 @@ export default function App() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value as any)}
-                      className="w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none appearance-none cursor-pointer"
+                      className="w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none appearance-none cursor-pointer overflow-hidden text-ellipsis"
                     >
                       <option value="all">Todos los estados</option>
                       <option value="held">Realizadas</option>
@@ -750,7 +750,7 @@ export default function App() {
                       <option value="cancelled_unbilled">No Realizadas (No se Cobra)</option>
                     </select>
                   </div>
-                  <div className="flex-[2] min-w-0 grid grid-cols-2 gap-2">
+                  <div className="flex-[2] min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1">Desde</span>
                       <input
@@ -846,7 +846,7 @@ export default function App() {
                                 className="w-full h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
                               />
                             </div>
-                            <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl">
+                            <div className="flex flex-col sm:flex-row bg-zinc-100 dark:bg-zinc-800/80 p-1 gap-1 rounded-xl">
                               <button
                                 type="button" onClick={() => setEditSessionStatus('held')}
                                 className={`flex-1 py-2 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}
