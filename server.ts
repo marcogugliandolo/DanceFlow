@@ -49,6 +49,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  if (req.method === 'DELETE' || req.method === 'POST') {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  }
+  next();
+});
+
 // Prevent caching on API requests
 app.use("/api", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -87,9 +94,16 @@ app.post("/api/activities/:id", (req, res) => {
 });
 
 app.delete("/api/activities/:id", (req, res) => {
-  db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
-  db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
-  res.json({ success: true });
+  console.log("DELETE /api/activities/:id ->", req.params.id);
+  try {
+    const r1 = db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
+    const r2 = db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
+    console.log("Delete result sessions:", r1, "activities:", r2);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("DELETE activities error:", err);
+    res.status(500).json({ error: "DB Error" });
+  }
 });
 
 // Get all sessions
@@ -113,14 +127,27 @@ app.post("/api/sessions", (req, res) => {
 
 app.post("/api/sessions/:id", (req, res) => {
   const s = req.body;
-  db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, attendeesCount) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.attendeesCount || null);
-  res.json({ success: true });
+  console.log("POST /api/sessions/:id ->", req.params.id, s);
+  try {
+    db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, attendeesCount) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.attendeesCount || null);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST session error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
 });
 
 app.delete("/api/sessions/:id", (req, res) => {
-  db.prepare("DELETE FROM class_sessions WHERE id = ?").run(req.params.id);
-  res.json({ success: true });
+  console.log("DELETE /api/sessions/:id ->", req.params.id);
+  try {
+    const result = db.prepare("DELETE FROM class_sessions WHERE id = ?").run(req.params.id);
+    console.log("Delete result:", result);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("DELETE session error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
 });
 
 
