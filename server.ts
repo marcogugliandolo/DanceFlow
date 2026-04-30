@@ -49,10 +49,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Prevent caching on API requests
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 // Get all activities
 app.get("/api/activities", (req, res) => {
   const activities = db.prepare("SELECT * FROM activities").all();
-  res.json(activities.map(a => ({...a, isRecurring: Boolean(a.isRecurring)})));
+  res.json(activities.map((a: any) => ({...a, isRecurring: Boolean(a.isRecurring)})));
 });
 
 // Save all activities
@@ -79,8 +87,8 @@ app.post("/api/activities/:id", (req, res) => {
 });
 
 app.delete("/api/activities/:id", (req, res) => {
-  db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
   db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
+  db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
   res.json({ success: true });
 });
 

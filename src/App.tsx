@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoBase64 from './logo';
@@ -277,7 +277,7 @@ export default function App() {
         new Date(s.date).toLocaleDateString(),
         actName,
         statusStr,
-        activity?.paymentType === 'monthly' ? '-' : (s.status === 'held' ? (s.attendeesCount?.toString() || '0') : '-'),
+        s.status === 'held' ? (s.attendeesCount?.toString() || '0') : '-',
         revStr
       ];
     });
