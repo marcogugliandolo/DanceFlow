@@ -12,6 +12,9 @@ export interface Activity {
 export interface Student {
   id: string;
   name: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
 }
 
 export interface ClassSession {
@@ -22,6 +25,7 @@ export interface ClassSession {
   justification?: string; // Reason for cancellation
   notes?: string; 
   attendeeIds?: string[];
+  duration?: number;
 }
 
 export interface SummaryStats {
@@ -39,5 +43,6 @@ export interface ActivityStats {
   cancelledUnbilledCount: number;
   totalRevenue: number;
   totalAttendees: number;
+  totalDuration: number;
   justifications: string[];
 }

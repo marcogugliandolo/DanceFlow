@@ -46,9 +46,22 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS students (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    notes TEXT
   );
 `);
+
+const tryAlterTable = (sql: string) => {
+  try { db.exec(sql); } catch (e) { /* ignore duplicate column errors */ }
+};
+
+tryAlterTable("ALTER TABLE students ADD COLUMN phone TEXT;");
+tryAlterTable("ALTER TABLE students ADD COLUMN email TEXT;");
+tryAlterTable("ALTER TABLE students ADD COLUMN notes TEXT;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN duration REAL DEFAULT 1;");
+tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;");
 
 // API endpoints to communicate with Frontend
 const app = express();
@@ -79,13 +92,13 @@ app.get("/api/activities", (req, res) => {
 // Save all activities
 app.post("/api/activities", (req, res) => {
   const activities = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO activities (id, name, location, pricePerClass, paymentType, isRecurring) VALUES (?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO activities (id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?)");
   
   db.transaction(() => {
     // Basic sync: delete all and insert or just insert/replace
     // For simplicity, handle just insert/replace
     for (const a of activities) {
-      insert.run(a.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0);
+      insert.run(a.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
     }
   })();
   res.json({ success: true });
@@ -94,8 +107,8 @@ app.post("/api/activities", (req, res) => {
 // Update or add single activity
 app.post("/api/activities/:id", (req, res) => {
   const a = req.body;
-  db.prepare("INSERT OR REPLACE INTO activities (id, name, location, pricePerClass, paymentType, isRecurring) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(a.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0);
+  db.prepare("INSERT OR REPLACE INTO activities (id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(a.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
   res.json({ success: true });
 });
 
@@ -125,11 +138,11 @@ app.get("/api/sessions", (req, res) => {
 // Save all sessions
 app.post("/api/sessions", (req, res) => {
   const sessions = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []));
+      insert.run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
     }
   })();
   res.json({ success: true });
@@ -139,8 +152,8 @@ app.post("/api/sessions/:id", (req, res) => {
   const s = req.body;
   console.log("POST /api/sessions/:id ->", req.params.id, s);
   try {
-    db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []));
+    db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
     res.json({ success: true });
   } catch (err: any) {
     console.error("POST session error:", err);
@@ -189,9 +202,10 @@ app.post("/api/external/clase", express.json(), (req, res) => {
     const sessionDate = date || new Date().toISOString().split('T')[0];
     const sessionId = crypto.randomUUID();
     const sessionStatus = status || 'held';
+    const duration = req.body.duration || 1;
 
-    db.prepare("INSERT INTO class_sessions (id, activityId, date, status, notes, justification, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(sessionId, activity.id, sessionDate, sessionStatus, notes || attendeesCount?.toString() || null, justification || null, JSON.stringify(attendeeIds || []));
+    db.prepare("INSERT INTO class_sessions (id, activityId, date, status, notes, justification, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(sessionId, activity.id, sessionDate, sessionStatus, notes || attendeesCount?.toString() || null, justification || null, JSON.stringify(attendeeIds || []), duration);
 
     res.json({
       success: true,
@@ -224,8 +238,8 @@ app.get("/api/students", (req, res) => {
 app.post("/api/students/:id", (req, res) => {
   const s = req.body;
   try {
-    db.prepare("INSERT OR REPLACE INTO students (id, name) VALUES (?, ?)")
-      .run(s.id, s.name);
+    db.prepare("INSERT OR REPLACE INTO students (id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?)")
+      .run(s.id, s.name, s.phone || null, s.email || null, s.notes || null);
     res.json({ success: true, student: s });
   } catch (err: any) {
     console.error("POST student error:", err);

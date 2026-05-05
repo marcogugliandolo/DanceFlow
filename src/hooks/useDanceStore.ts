@@ -43,9 +43,14 @@ export function useDanceStore(selectedMonth?: string) {
           const sessRaw = await sesRes.json();
           const stus = await stuRes.json();
 
-          // Just pass through all sessions without merging
           setActivities(acts);
-          setSessions(sessRaw);
+          setSessions(prev => {
+            const serverIds = new Set(sessRaw.map((s: any) => s.id));
+            const pendingLocal = prev.filter(s => !serverIds.has(s.id));
+            // Combine pending local (new records) with server records
+            // Note: Does not handle local deletes perfectly, but avoids ADD glitch
+            return [...sessRaw, ...pendingLocal];
+          });
           setStudents(stus);
         }
       } catch (err) {
@@ -130,6 +135,14 @@ export function useDanceStore(selectedMonth?: string) {
     syncStudent(student);
   };
 
+  const editStudent = (id: string, updatedStudent: Omit<Student, 'id'>) => {
+    const newStudent = { ...updatedStudent, id };
+    setStudents((prev) =>
+      prev.map((s) => (s.id === id ? newStudent : s))
+    );
+    syncStudent(newStudent);
+  };
+
   const deleteStudent = (id: string) => {
     setStudents((prev) => prev.filter((s) => s.id !== id));
     setSessions((prev) => {
@@ -171,6 +184,7 @@ export function useDanceStore(selectedMonth?: string) {
         cancelledUnbilledCount: 0,
         totalRevenue: 0,
         totalAttendees: 0,
+        totalDuration: 0,
         justifications: [],
       };
 
@@ -207,6 +221,9 @@ export function useDanceStore(selectedMonth?: string) {
         actStats.heldCount++;
         actStats.totalRevenue += sessionRevenue;
         actStats.totalAttendees += attendees;
+        if (session.duration) {
+          actStats.totalDuration += session.duration;
+        }
       } else {
         stats.totalCancelled++;
         
@@ -246,6 +263,7 @@ export function useDanceStore(selectedMonth?: string) {
     deleteSession,
     deleteActivity,
     addStudent,
+    editStudent,
     deleteStudent,
   };
 }
