@@ -87,10 +87,11 @@ const ProfileView = ({
     const downloadAnchorNode = document.createElement("a");
     downloadAnchorNode.setAttribute("href", dataStr);
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateObj = new Date();
+    const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}_${String(dateObj.getMonth() + 1).padStart(2, "0")}_${dateObj.getFullYear()}`;
     downloadAnchorNode.setAttribute(
       "download",
-      `danceflow_backup_${dateStr}.json`,
+      `salsanova_backup_${dateStr}.json`,
     );
     document.body.appendChild(downloadAnchorNode); // required for firefox
     downloadAnchorNode.click();
@@ -761,7 +762,7 @@ export default function App() {
       );
 
       const currentDate = new Date();
-      const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, "0")}_${currentDate.getFullYear()}`;
+      const formattedDate = `${String(currentDate.getDate()).padStart(2, "0")}_${String(currentDate.getMonth() + 1).padStart(2, "0")}_${currentDate.getFullYear()}`;
       doc.save(`registro_sesiones_${formattedDate}.pdf`);
       return;
     }
@@ -1026,7 +1027,7 @@ export default function App() {
     );
 
     const currentDate = new Date();
-    const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, "0")}_${currentDate.getFullYear()}`;
+    const formattedDate = `${String(currentDate.getDate()).padStart(2, "0")}_${String(currentDate.getMonth() + 1).padStart(2, "0")}_${currentDate.getFullYear()}`;
     doc.save(`registro_sesiones_${formattedDate}.pdf`);
   };
 
