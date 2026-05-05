@@ -111,6 +111,7 @@ export default function App() {
   
   const [showAttendeesModal, setShowAttendeesModal] = useState<'create' | 'edit' | null>(null);
   const [newStudentName, setNewStudentName] = useState('');
+  const [studentHistoryId, setStudentHistoryId] = useState<string | null>(null);
 
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -1461,6 +1462,13 @@ export default function App() {
                               {isSelected && <CheckCircle2 className="w-4 h-4" />}
                             </button>
                             <span className="flex-1 font-medium text-base text-zinc-900 dark:text-zinc-100">{student.name}</span>
+                            <button
+                              onClick={() => setStudentHistoryId(student.id)}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                              title="Ver historial de asistencia"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
                             <button 
                               onClick={() => {
                               deleteStudent(student.id);
@@ -1486,6 +1494,123 @@ export default function App() {
                     Terminar Selección
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {studentHistoryId && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-zinc-200/50 dark:border-white/10"
+              >
+                {(() => {
+                  const student = students.find(s => s.id === studentHistoryId);
+                  if (!student) return null;
+                  
+                  // Encontrar sesiones de este usuario ordenadas por fecha descendente
+                  const studentSessions = sessions
+                    .filter(s => s.attendeeIds?.includes(student.id))
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    
+                  // Agrupar contador por actividad
+                  const activityCounts = studentSessions.reduce((acc, session) => {
+                    if (session.status !== 'held') return acc;
+                    acc[session.activityId] = (acc[session.activityId] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  return (
+                    <>
+                      <div className="p-6 pb-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/20">
+                        <div>
+                          <h2 className="text-xl font-black text-zinc-900 dark:text-white capitalize">{student.name}</h2>
+                          <p className="text-sm font-medium text-zinc-500 mt-1">
+                            {studentSessions.length} {studentSessions.length === 1 ? 'clase asistida' : 'clases registradas'}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => setStudentHistoryId(null)}
+                          className="w-10 h-10 flex items-center justify-center bg-zinc-200/50 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="overflow-y-auto p-4 sm:p-6 space-y-6 bg-zinc-50/30 dark:bg-zinc-900/30">
+                        {/* Resumen por Actividad */}
+                        {Object.keys(activityCounts).length > 0 && (
+                          <div className="space-y-3">
+                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-2">Asistencia por Actividad</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(activityCounts).map(([actId, count]) => {
+                                const act = activities.find(a => a.id === actId);
+                                if (!act) return null;
+                                return (
+                                  <div key={actId} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-sm font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50">
+                                    <span className="truncate max-w-[120px]">{act.name}</span>
+                                    <span className="text-rose-500 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded-md text-xs">{count}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Listado de Sesiones */}
+                        <div className="space-y-3">
+                          <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-2">Historial de Clases</h3>
+                          {studentSessions.length === 0 ? (
+                            <div className="text-center p-8 bg-zinc-100/50 dark:bg-zinc-800/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                              <p className="text-sm font-medium text-zinc-500">Aún no tiene clases registradas.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {studentSessions.map(session => {
+                                const activity = activities.find(a => a.id === session.activityId);
+                                const isHeld = session.status === 'held';
+                                const dateObj = new Date(session.date);
+                                const formattedDate = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                                
+                                return (
+                                  <div key={session.id} className="flex items-center p-3 sm:p-4 bg-white dark:bg-zinc-800/80 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
+                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-zinc-100 dark:bg-zinc-900 rounded-xl mr-3 sm:mr-4 border border-zinc-200 dark:border-zinc-700">
+                                      <span className="text-[10px] font-bold text-zinc-400 uppercase">{formattedDate.split(' ')[1]}</span>
+                                      <span className="text-lg font-black text-zinc-700 dark:text-zinc-200 leading-none">{formattedDate.split(' ')[0]}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">{activity?.name || 'Actividad Borrada'}</h4>
+                                      <p className="text-xs font-semibold text-zinc-500 truncate mt-0.5">
+                                        {isHeld ? 'Realizada' : 'No asistió'}
+                                        {session.notes && ` • ${session.notes}`}
+                                      </p>
+                                    </div>
+                                    <div className="ml-2 flex-shrink-0">
+                                      {isHeld ? (
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                                          <CheckCircle2 className="w-4 h-4" />
+                                        </div>
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                                          <X className="w-4 h-4" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </motion.div>
             </motion.div>
           )}
