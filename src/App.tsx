@@ -77,11 +77,6 @@ const ProfileView = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setProfile(editProfile);
-    try {
-      localStorage.setItem("danceflow_profile", JSON.stringify(editProfile));
-    } catch (e) {
-      alert("Error al guardar: la imagen de perfil podría ser demasiado pesada. El navegador no permite guardar archivos grandes. Por favor intenta con una imagen de menor tamaño.");
-    }
     setIsEditing(false);
   };
 
@@ -97,11 +92,6 @@ const ProfileView = ({
     }
     const newProf = { ...profile, password: passwordState.new };
     setProfile(newProf);
-    try {
-      localStorage.setItem("danceflow_profile", JSON.stringify(newProf));
-    } catch (e) {
-      alert("Error al guardar en el almacenamiento local. Posiblemente falta de espacio.");
-    }
     setPasswordSuccess(true);
     setTimeout(() => {
       setShowPasswordChange(false);
@@ -503,6 +493,17 @@ export default function App() {
           password: "password123",
         };
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("danceflow_profile", JSON.stringify(profile));
+    } catch (e: any) {
+      console.error("Error saving profile:", e);
+      if (e.name === "QuotaExceededError") {
+        alert("Atención: El almacenamiento local está lleno. Es posible que los últimos cambios (como la imagen del perfil) no se guarden correctamente. Intenta limpiar datos en tu historial.");
+      }
+    }
+  }, [profile]);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem("auth_danceflow") === "true";
