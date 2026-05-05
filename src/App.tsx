@@ -30,12 +30,45 @@ const ProfileView = ({
   });
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
+  useEffect(() => {
+    setEditProfile(profile);
+  }, [profile]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setEditProfile({ ...editProfile, avatarUrl: reader.result as string });
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 500;
+          const MAX_HEIGHT = 500;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG with 0.8 quality
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          setEditProfile(prev => ({ ...prev, avatarUrl: dataUrl }));
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
