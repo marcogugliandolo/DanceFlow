@@ -39,8 +39,14 @@ db.exec(`
     date TEXT NOT NULL,
     status TEXT NOT NULL,
     justification TEXT,
-    attendeesCount INTEGER,
+    notes TEXT,
+    attendeeIds TEXT,
     FOREIGN KEY (activityId) REFERENCES activities (id)
+  );
+
+  CREATE TABLE IF NOT EXISTS students (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL
   );
 `);
 
@@ -109,17 +115,21 @@ app.delete("/api/activities/:id", (req, res) => {
 // Get all sessions
 app.get("/api/sessions", (req, res) => {
   const sessions = db.prepare("SELECT * FROM class_sessions").all();
-  res.json(sessions);
+  // Ensure attendeeIds is returned as an array or empty array if null
+  res.json(sessions.map((s: any) => ({
+    ...s,
+    attendeeIds: s.attendeeIds ? JSON.parse(s.attendeeIds) : []
+  })));
 });
 
 // Save all sessions
 app.post("/api/sessions", (req, res) => {
   const sessions = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, attendeesCount) VALUES (?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)");
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, s.activityId, s.date, s.status, s.justification || null, s.attendeesCount || null);
+      insert.run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []));
     }
   })();
   res.json({ success: true });
@@ -129,8 +139,8 @@ app.post("/api/sessions/:id", (req, res) => {
   const s = req.body;
   console.log("POST /api/sessions/:id ->", req.params.id, s);
   try {
-    db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, attendeesCount) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.attendeesCount || null);
+    db.prepare("INSERT OR REPLACE INTO class_sessions (id, activityId, date, status, justification, notes, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(s.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []));
     res.json({ success: true });
   } catch (err: any) {
     console.error("POST session error:", err);
@@ -162,7 +172,7 @@ app.post("/api/external/clase", express.json(), (req, res) => {
       return res.status(401).json({ error: "No autorizado. Verifique su API Key en el encabezado Authorization: Bearer <API_KEY>" });
     }
 
-    const { className, attendeesCount, date, status, justification } = req.body;
+    const { className, attendeesCount, date, status, justification, notes, attendeeIds } = req.body;
 
     if (!className) {
       return res.status(400).json({ error: "El campo 'className' es obligatorio para asociar la clase." });
@@ -180,8 +190,8 @@ app.post("/api/external/clase", express.json(), (req, res) => {
     const sessionId = crypto.randomUUID();
     const sessionStatus = status || 'held';
 
-    db.prepare("INSERT INTO class_sessions (id, activityId, date, status, attendeesCount, justification) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(sessionId, activity.id, sessionDate, sessionStatus, attendeesCount || null, justification || null);
+    db.prepare("INSERT INTO class_sessions (id, activityId, date, status, notes, justification, attendeeIds) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(sessionId, activity.id, sessionDate, sessionStatus, notes || attendeesCount?.toString() || null, justification || null, JSON.stringify(attendeeIds || []));
 
     res.json({
       success: true,
@@ -192,7 +202,8 @@ app.post("/api/external/clase", express.json(), (req, res) => {
         activityName: activity.name,
         date: sessionDate,
         status: sessionStatus,
-        attendeesCount: attendeesCount || 'No especificado',
+        notes: notes || attendeesCount?.toString() || 'No especificado',
+        attendeeIds: attendeeIds || [],
         justification: justification || null
       }
     });
@@ -200,6 +211,35 @@ app.post("/api/external/clase", express.json(), (req, res) => {
   } catch (error) {
     console.error("Error en API Externa:", error);
     res.status(500).json({ error: "Error interno del servidor al registrar la clase externa" });
+  }
+});
+
+// Get all students
+app.get("/api/students", (req, res) => {
+  const students = db.prepare("SELECT * FROM students").all();
+  res.json(students);
+});
+
+// Update or add single student
+app.post("/api/students/:id", (req, res) => {
+  const s = req.body;
+  try {
+    db.prepare("INSERT OR REPLACE INTO students (id, name) VALUES (?, ?)")
+      .run(s.id, s.name);
+    res.json({ success: true, student: s });
+  } catch (err: any) {
+    console.error("POST student error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
+});
+
+app.delete("/api/students/:id", (req, res) => {
+  try {
+    db.prepare("DELETE FROM students WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("DELETE student error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
   }
 });
 

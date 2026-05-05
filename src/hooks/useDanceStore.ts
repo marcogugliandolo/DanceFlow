@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Activity, ClassSession, SummaryStats, ActivityStats } from '../types';
+import { Activity, ClassSession, SummaryStats, ActivityStats, Student } from '../types';
 
 export function useDanceStore(selectedMonth?: string) {
   const [activities, setActivities] = useState<Activity[]>(() => {
@@ -12,6 +12,11 @@ export function useDanceStore(selectedMonth?: string) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [students, setStudents] = useState<Student[]>(() => {
+    const saved = localStorage.getItem('dance_students');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   useEffect(() => {
     localStorage.setItem('dance_activities', JSON.stringify(activities));
   }, [activities]);
@@ -20,21 +25,28 @@ export function useDanceStore(selectedMonth?: string) {
     localStorage.setItem('dance_sessions', JSON.stringify(sessions));
   }, [sessions]);
 
+  useEffect(() => {
+    localStorage.setItem('dance_students', JSON.stringify(students));
+  }, [students]);
+
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [actRes, sesRes] = await Promise.all([
+        const [actRes, sesRes, stuRes] = await Promise.all([
           fetch('/api/activities', { cache: 'no-store' }),
-          fetch('/api/sessions', { cache: 'no-store' })
+          fetch('/api/sessions', { cache: 'no-store' }),
+          fetch('/api/students', { cache: 'no-store' })
         ]);
-        if (actRes.ok && sesRes.ok) {
+        if (actRes.ok && sesRes.ok && stuRes.ok) {
           const acts = await actRes.json();
-          const sess = await sesRes.json();
-          
-          // After initial load, server is always truth
+          const sessRaw = await sesRes.json();
+          const stus = await stuRes.json();
+
+          // Just pass through all sessions without merging
           setActivities(acts);
-          setSessions(sess);
+          setSessions(sessRaw);
+          setStudents(stus);
         }
       } catch (err) {
         console.error("Failed to fetch from server", err);
@@ -57,12 +69,20 @@ export function useDanceStore(selectedMonth?: string) {
     try { await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); } catch(e) {}
   };
 
+  const syncStudent = async (student: Student) => {
+    try { await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) }); } catch(e) {}
+  };
+
   const deleteActivityFromServer = async (id: string) => {
     try { await fetch(`/api/activities/${id}`, { method: 'DELETE' }); } catch(e) {}
   };
 
   const deleteSessionFromServer = async (id: string) => {
     try { await fetch(`/api/sessions/${id}`, { method: 'DELETE' }); } catch(e) {}
+  };
+
+  const deleteStudentFromServer = async (id: string) => {
+    try { await fetch(`/api/students/${id}`, { method: 'DELETE' }); } catch(e) {}
   };
 
   // Actions
@@ -103,6 +123,29 @@ export function useDanceStore(selectedMonth?: string) {
     setActivities((prev) => prev.filter((a) => a.id !== id));
     setSessions((prev) => prev.filter((s) => s.activityId !== id));
     deleteActivityFromServer(id);
+  };
+
+  const addStudent = (student: Student) => {
+    setStudents((prev) => [...prev, student]);
+    syncStudent(student);
+  };
+
+  const deleteStudent = (id: string) => {
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+    setSessions((prev) => {
+      let changed = false;
+      const nextSessions = prev.map(s => {
+        if (s.attendeeIds && s.attendeeIds.includes(id)) {
+          changed = true;
+          const newS = { ...s, attendeeIds: s.attendeeIds.filter(aid => aid !== id) };
+          syncSession(newS);
+          return newS;
+        }
+        return s;
+      });
+      return changed ? nextSessions : prev;
+    });
+    deleteStudentFromServer(id);
   };
 
   // Computations
@@ -148,7 +191,7 @@ export function useDanceStore(selectedMonth?: string) {
       const actStats = stats.activities[session.activityId];
 
       if (session.status === 'held') {
-        const attendees = session.attendeesCount || 0;
+        const attendees = session.attendeeIds?.length || 0;
         
         // Calculate revenue based on payment type
         let sessionRevenue = 0;
@@ -194,6 +237,7 @@ export function useDanceStore(selectedMonth?: string) {
   return {
     activities,
     sessions,
+    students,
     summary,
     addActivity,
     editActivity,
@@ -201,5 +245,7 @@ export function useDanceStore(selectedMonth?: string) {
     editSession,
     deleteSession,
     deleteActivity,
+    addStudent,
+    deleteStudent,
   };
 }

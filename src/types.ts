@@ -9,13 +9,19 @@ export interface Activity {
   isRecurring?: boolean;
 }
 
+export interface Student {
+  id: string;
+  name: string;
+}
+
 export interface ClassSession {
   id: string;
   activityId: string;
   date: string; // YYYY-MM-DD
   status: ClassStatus;
   justification?: string; // Reason for cancellation
-  attendeesCount?: number; // Number of people who attended
+  notes?: string; 
+  attendeeIds?: string[];
 }
 
 export interface SummaryStats {

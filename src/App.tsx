@@ -61,6 +61,7 @@ export default function App() {
   const {
     activities,
     sessions,
+    students,
     summary,
     addActivity,
     editActivity,
@@ -68,6 +69,8 @@ export default function App() {
     editSession,
     deleteSession,
     deleteActivity,
+    addStudent,
+    deleteStudent,
   } = useDanceStore(dashboardMonth);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'historial'>('dashboard');
@@ -95,16 +98,22 @@ export default function App() {
   const [sessionDate, setSessionDate] = useState('');
   const [sessionStatus, setSessionStatus] = useState<ClassStatus>('held');
   const [sessionJustification, setSessionJustification] = useState('');
-  const [sessionAttendees, setSessionAttendees] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [sessionAttendeeIds, setSessionAttendeeIds] = useState<string[]>([]);
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editSessionActId, setEditSessionActId] = useState('');
   const [editSessionDate, setEditSessionDate] = useState('');
   const [editSessionStatus, setEditSessionStatus] = useState<ClassStatus>('held');
   const [editSessionJustification, setEditSessionJustification] = useState('');
-  const [editSessionAttendees, setEditSessionAttendees] = useState('');
+  const [editSessionNotes, setEditSessionNotes] = useState('');
+  const [editSessionAttendeeIds, setEditSessionAttendeeIds] = useState<string[]>([]);
+  
+  const [showAttendeesModal, setShowAttendeesModal] = useState<'create' | 'edit' | null>(null);
+  const [newStudentName, setNewStudentName] = useState('');
 
-  const [filterStatus, setFilterStatus] = useState<ClassStatus | 'all'>('all');
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
 
@@ -185,14 +194,15 @@ export default function App() {
       date: sessionDate,
       status: sessionStatus,
       justification: sessionStatus !== 'held' ? sessionJustification : undefined,
-      attendeesCount: sessionStatus === 'held' ? (parseInt(sessionAttendees) || 0) : undefined,
+      notes: sessionStatus === 'held' ? sessionNotes : undefined,
+      attendeeIds: sessionStatus === 'held' ? sessionAttendeeIds : [],
     });
     setSessionActId('');
     setSessionDate('');
     setSessionStatus('held');
     setSessionJustification('');
-    setSessionAttendees('');
-    alert('¡Clase registrada correctamente!');
+    setSessionNotes('');
+    setSessionAttendeeIds([]);
   };
 
   const handleEditSessionSubmit = (e: React.FormEvent) => {
@@ -203,7 +213,8 @@ export default function App() {
       date: editSessionDate,
       status: editSessionStatus,
       justification: editSessionStatus !== 'held' ? editSessionJustification : undefined,
-      attendeesCount: editSessionStatus === 'held' ? (parseInt(editSessionAttendees) || 0) : undefined,
+      notes: editSessionStatus === 'held' ? editSessionNotes : undefined,
+      attendeeIds: editSessionStatus === 'held' ? editSessionAttendeeIds : [],
     });
     setEditingSessionId(null);
   };
@@ -214,7 +225,8 @@ export default function App() {
     setEditSessionDate(session.date);
     setEditSessionStatus(session.status);
     setEditSessionJustification(session.justification || '');
-    setEditSessionAttendees((session.attendeesCount || 0).toString());
+    setEditSessionNotes(session.notes || '');
+    setEditSessionAttendeeIds(session.attendeeIds || []);
   };
 
   const handleExportPDF = async () => {
@@ -246,45 +258,120 @@ export default function App() {
     doc.text(filterText, 14, 62);
     
     let filtered = sessions;
-    if (filterStatus !== 'all') filtered = filtered.filter(s => s.status === filterStatus);
+    if (filterStatuses.length > 0) filtered = filtered.filter(s => filterStatuses.includes(s.status));
     if (filterDateStart) filtered = filtered.filter(s => s.date >= filterDateStart);
     if (filterDateEnd) filtered = filtered.filter(s => s.date <= filterDateEnd);
+
+    if (filtered.length === 0) {
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'italic');
+      doc.text('No hay registros de sesiones para los filtros seleccionados.', 14, 80);
+      
+      const currentDate = new Date();
+      const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}_${currentDate.getFullYear()}`;
+      doc.save(`registro_sesiones_${formattedDate}.pdf`);
+      return;
+    }
     
     filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     let totalRevenue = 0;
     
-    const tableData = filtered.map(s => {
+    // Calculate total revenue independently
+    filtered.forEach(s => {
       const activity = activities.find(a => a.id === s.activityId);
+      if (!activity) return;
+      if (activity.paymentType !== 'monthly') {
+        if (s.status === 'held' || s.status === 'cancelled_billed') {
+          totalRevenue += activity.pricePerClass;
+        }
+      }
+    });
+    
+    const groupedMap = new Map<string, {
+      activity: any,
+      sessions: any[],
+      totalAmount: number,
+      statusCounts: { held: number, cancelled_billed: number, cancelled_unbilled: number }
+    }>();
+
+    filtered.forEach(s => {
+      const activity = activities.find(a => a.id === s.activityId);
+      if (!activity) return;
+
       let amount = 0;
-      
-      if (activity) {
-        if (activity.paymentType === 'monthly') amount = 0;
-        else if (s.status === 'held') amount = activity.pricePerClass;
+      if (activity.paymentType !== 'monthly') {
+        if (s.status === 'held') amount = activity.pricePerClass;
         else if (s.status === 'cancelled_billed') amount = activity.pricePerClass;
       }
+
+      if (!groupedMap.has(activity.id)) {
+        groupedMap.set(activity.id, {
+          activity,
+          sessions: [],
+          totalAmount: 0,
+          statusCounts: { held: 0, cancelled_billed: 0, cancelled_unbilled: 0 }
+        });
+      }
       
-      totalRevenue += amount;
+      const group = groupedMap.get(activity.id)!;
+      group.sessions.push(s);
+      group.totalAmount += amount;
       
-      const actName = activity?.name || 'Clase eliminada';
-      const statusStr = s.status === 'held' ? 'Realizada' 
-                      : s.status === 'cancelled_billed' ? 'Cancelada (Cobra)'
-                      : 'Cancelada (No Cobra)';
-                      
-      const revStr = activity?.paymentType === 'monthly' ? 'Mensual' : `${amount.toFixed(2)}€`;
+      if (s.status === 'held') group.statusCounts.held++;
+      else if (s.status === 'cancelled_billed') group.statusCounts.cancelled_billed++;
+      else if (s.status === 'cancelled_unbilled') group.statusCounts.cancelled_unbilled++;
+    });
+    
+    // Create table data from grouped map
+    const tableData = Array.from(groupedMap.values()).map(group => {
+      const { activity, sessions, totalAmount, statusCounts } = group;
+      const actName = activity.name;
+      
+      const isMonthly = activity.paymentType === 'monthly';
+      
+      let revStr = '';
+      if (statusCounts.held === 0 && statusCounts.cancelled_billed === 0 && statusCounts.cancelled_unbilled > 0) {
+        revStr = '-';
+      } else {
+        revStr = isMonthly ? 'Mensual' : `${totalAmount.toFixed(2)}€`;
+      }
+      
+      // Sort sessions chronologically for parallel lines
+      sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      const dateLines = sessions.map(s => {
+        const dateObj = new Date(s.date);
+        return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      }).join('\n');
+      
+      const statusLines = sessions.map(s => {
+        if (s.status === 'held') return 'Realizada';
+        if (s.status === 'cancelled_billed') return 'Can. (Cobra)';
+        return 'Can. (No Cobra)';
+      }).join('\n');
+      
+      const notesLines = sessions.map(s => {
+        let noteContent = s.notes || '';
+        if (s.status === 'cancelled_billed' || s.status === 'cancelled_unbilled') {
+          noteContent = s.justification || '';
+        }
+        return noteContent.trim() || '-';
+      }).join('\n');
       
       return [
-        new Date(s.date).toLocaleDateString(),
         actName,
-        statusStr,
-        s.status === 'held' ? (s.attendeesCount?.toString() || '0') : '-',
+        dateLines,
+        statusLines,
+        notesLines,
         revStr
       ];
     });
     
     autoTable(doc, {
       startY: 70,
-      head: [['Fecha', 'Actividad', 'Estado', 'Asistentes', 'Ingreso']],
+      head: [['Actividad', 'Fecha(s)', 'Estado', 'Notas / Just.', 'Ingreso']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [244, 63, 94], textColor: 255, fontStyle: 'bold' },
@@ -295,49 +382,71 @@ export default function App() {
     
     const finalY = (doc as any).lastAutoTable.finalY || 70;
     
-    const monthlyActs = activities.filter(a => a.paymentType === 'monthly');
-    const monthlyRec = monthlyActs.filter(a => a.isRecurring).reduce((ac, a) => ac + a.pricePerClass, 0);
-    const totalWithMonthly = totalRevenue + monthlyRec;
+    const filteredActivityIds = new Set(filtered.map(s => s.activityId));
+    
+    let numMonths = 1;
+    let startDateForMonths = filterDateStart;
+    let endDateForMonths = filterDateEnd;
+    
+    if (!startDateForMonths && filtered.length > 0) {
+      startDateForMonths = filtered[filtered.length - 1].date; // filtered is sorted descending, so last is oldest
+    }
+    if (!endDateForMonths && filtered.length > 0) {
+      endDateForMonths = filtered[0].date;
+    }
+
+    if (startDateForMonths && endDateForMonths) {
+      const d1 = new Date(startDateForMonths);
+      const d2 = new Date(endDateForMonths);
+      let months = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth()) + 1;
+      if (months > 0) numMonths = months;
+    }
+
+    const monthlyActs = activities.filter(a => {
+      if (a.paymentType !== 'monthly') return false;
+      if (!filteredActivityIds.has(a.id)) return false;
+      const validSessions = filtered.filter(s => s.activityId === a.id && s.status !== 'cancelled_unbilled');
+      return validSessions.length > 0;
+    });
+    
+    const monthlyRec = monthlyActs.filter(a => a.isRecurring).reduce((ac, a) => ac + (a.pricePerClass * numMonths), 0);
+    const monthlyNonRec = monthlyActs.filter(a => !a.isRecurring).reduce((ac, a) => {
+      const classSessions = filtered.filter(s => s.activityId === a.id && s.status !== 'cancelled_unbilled');
+      const uniqueMonths = new Set(classSessions.map(s => {
+        const d = new Date(s.date);
+        return `${d.getFullYear()}-${d.getMonth()}`;
+      }));
+      return ac + (a.pricePerClass * uniqueMonths.size);
+    }, 0);
+    const totalWithMonthly = totalRevenue + monthlyRec + monthlyNonRec;
 
     // Summary Box
     doc.setFillColor(245, 245, 247);
-    doc.roundedRect(14, finalY + 10, 182, 35, 3, 3, 'F');
+    doc.roundedRect(14, finalY + 10, 182, 45, 3, 3, 'F');
     
     doc.setFontSize(12);
     doc.setTextColor(30, 30, 30);
     doc.setFont('helvetica', 'bold');
-    doc.text('Resumen Financiero', 20, finalY + 20);
+    doc.text('Resumen del Periodo', 20, finalY + 20);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Ingresos por sesiones individuales: ${totalRevenue.toFixed(2)}€`, 20, finalY + 28);
+    doc.text(`Total de sesiones en el registro: ${filtered.length}`, 20, finalY + 28);
+    doc.text(`Ingresos por sesiones individuales: ${totalRevenue.toFixed(2)}€`, 20, finalY + 34);
     
-    if (monthlyRec > 0) {
-      doc.text(`Cuotas mensuales recurrentes: +${monthlyRec.toFixed(2)}€`, 20, finalY + 34);
+    const totalMonthlyText = monthlyRec + monthlyNonRec;
+    if (totalMonthlyText > 0) {
+      doc.text(`Cuotas mensuales${numMonths > 1 ? ` (${numMonths} meses)` : ''}: +${totalMonthlyText.toFixed(2)}€`, 20, finalY + 40);
     }
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(244, 63, 94);
-    doc.text(`Total Periodo: ${totalWithMonthly.toFixed(2)}€`, 130, finalY + 34);
+    doc.text(`Total Periodo: ${totalWithMonthly.toFixed(2)}€`, 130, finalY + 40);
 
-    const blob = doc.output('blob');
-    const file = new File([blob], `registro_salsanova_${new Date().getTime()}.pdf`, { type: 'application/pdf' });
-    
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: 'Registro de Clases - SalsaNova',
-          text: 'Se adjunta el reporte de sesiones generado desde SalsaNova.'
-        });
-      } catch (e) {
-        console.log('Error sharing', e);
-        doc.save(`registro_salsanova_${new Date().getTime()}.pdf`);
-      }
-    } else {
-      doc.save(`registro_salsanova_${new Date().getTime()}.pdf`);
-    }
+    const currentDate = new Date();
+    const formattedDate = `${String(currentDate.getMonth() + 1).padStart(2, '0')}_${currentDate.getFullYear()}`;
+    doc.save(`registro_sesiones_${formattedDate}.pdf`);
   };
 
   if (!isAuthenticated) {
@@ -447,7 +556,7 @@ export default function App() {
       </div>
 
       {/* Header Flotante */}
-      <header className="fixed top-3 inset-x-0 mx-auto z-50 w-[96%] max-w-4xl">
+      <header className="absolute top-3 inset-x-0 mx-auto z-50 w-[96%] max-w-6xl">
         <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 gap-3 sm:gap-0">
           
           {/* Fila superior en móvil: Logo + Acciones */}
@@ -527,7 +636,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="pt-40 sm:pt-28 pb-12 px-4 max-w-4xl mx-auto">
+      <main className="pt-40 sm:pt-28 pb-12 px-4 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' ? (
             <motion.div
@@ -709,32 +818,33 @@ export default function App() {
                                     value={editActName} onChange={e => setEditActName(e.target.value)}
                                     className="w-full min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                   />
-                                  <div className="flex gap-2">
-                                    <input
-                                      required placeholder="Lugar" 
-                                      value={editActLocation} onChange={e => setEditActLocation(e.target.value)}
-                                      className="flex-[2] min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
-                                    />
-                                    <div className="flex flex-col sm:flex-row gap-2 flex-[2] min-w-0">
-                                      <select
-                                        value={editActPaymentType}
-                                        onChange={(e) => setEditActPaymentType(e.target.value as any)}
-                                        className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium text-zinc-900 dark:text-zinc-100 appearance-none cursor-pointer"
-                                      >
-                                        <option value="fixed">Fijo por sesión</option>
-                                        <option value="monthly">Cuota mensual</option>
-                                      </select>
-                                      
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col sm:flex-row gap-2">
                                       <input
-                                        required type="number" step="0.01" placeholder="Precio (€)" 
-                                        value={editActPrice} onChange={e => setEditActPrice(e.target.value)}
-                                        className="w-full sm:w-24 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                        required placeholder="Lugar" 
+                                        value={editActLocation} onChange={e => setEditActLocation(e.target.value)}
+                                        className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                                       />
+                                      <div className="flex flex-1 gap-2 min-w-0">
+                                        <select
+                                          value={editActPaymentType}
+                                          onChange={(e) => setEditActPaymentType(e.target.value as any)}
+                                          className="flex-[2] min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium text-zinc-900 dark:text-zinc-100 appearance-none cursor-pointer"
+                                        >
+                                          <option value="fixed">Fijo</option>
+                                          <option value="monthly">Cuota</option>
+                                        </select>
+                                        
+                                        <input
+                                          required type="number" step="0.01" placeholder="Precio (€)" 
+                                          value={editActPrice} onChange={e => setEditActPrice(e.target.value)}
+                                          className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                        />
+                                      </div>
                                     </div>
                                     
                                     {editActPaymentType === 'monthly' && (
-                                      <div className="flex items-center justify-between px-3 py-2.5 mt-2 bg-white dark:bg-zinc-800/80 rounded-xl shadow-sm border border-zinc-200/50 dark:border-zinc-700/50 cursor-pointer" onClick={() => setEditActIsRecurring(!editActIsRecurring)}>
-                                        <span className="leading-tight text-sm font-bold text-zinc-700 dark:text-zinc-300">Recurrente</span>
+                                      <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-zinc-800/80 rounded-xl shadow-sm border border-zinc-200/50 dark:border-zinc-700/50 cursor-pointer" onClick={() => setEditActIsRecurring(!editActIsRecurring)}>
                                         <button
                                           type="button"
                                           role="switch"
@@ -743,6 +853,10 @@ export default function App() {
                                         >
                                           <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${editActIsRecurring ? 'translate-x-4' : 'translate-x-[2px]'}`} />
                                         </button>
+                                        <div className="flex flex-col">
+                                          <span className="leading-tight text-sm font-bold text-zinc-800 dark:text-zinc-200">Recurrente</span>
+                                          <span className="leading-tight text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">Automáticamente suma el ingreso todos los meses sin registrar sesiones.</span>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -839,7 +953,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSessionStatus('held')}
-                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] ${
+                        className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] text-center ${
                           sessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
@@ -848,22 +962,22 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSessionStatus('cancelled_billed')}
-                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] leading-tight ${
+                        className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${
                           sessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
                         <span className="block">No Realizada</span>
-                        <span className="block text-[9px] sm:text-[10px] opacity-80">(Se cobra)</span>
+                        <span className="block text-[8px] sm:text-[9px] opacity-80 mt-0.5">(Se cobra)</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSessionStatus('cancelled_unbilled')}
-                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[56px] leading-tight ${
+                        className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${
                           sessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                       >
                         <span className="block">No Realizada</span>
-                        <span className="block text-[9px] sm:text-[10px] opacity-80">(No cobra)</span>
+                        <span className="block text-[8px] sm:text-[9px] opacity-80 mt-0.5">(No cobra)</span>
                       </button>
                     </div>
 
@@ -878,14 +992,21 @@ export default function App() {
                           className="overflow-hidden px-1 -mx-1"
                         >
                           <div className="pt-1 pb-1">
-                            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Número de Asistentes</label>
+                            <label className="block mt-1 text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Asistentes</label>
+                            <button
+                                type="button"
+                                onClick={() => setShowAttendeesModal('create')}
+                                className="w-full h-[52px] sm:h-14 flex items-center justify-between px-4 bg-zinc-100/50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl text-base sm:text-sm text-zinc-700 dark:text-zinc-300 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                              >
+                                <span>{sessionAttendeeIds.length > 0 ? `${sessionAttendeeIds.length} Asistentes seleccionados` : 'Seleccionar Asistentes'}</span>
+                                <User className="w-4 h-4 text-zinc-400" />
+                            </button>
+                            <label className="block mt-4 text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">Notas</label>
                             <input
-                              type="number"
-                              min="0"
-                              required
-                              placeholder="Ej. 5"
-                              value={sessionAttendees}
-                              onChange={(e) => setSessionAttendees(e.target.value)}
+                              type="text"
+                              placeholder="Ej. Clase enfocada en giros"
+                              value={sessionNotes}
+                              onChange={(e) => setSessionNotes(e.target.value)}
                               className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100 shadow-sm"
                             />
                           </div>
@@ -941,24 +1062,70 @@ export default function App() {
                     onClick={handleExportPDF}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-sm font-bold shadow-md hover:opacity-90 active:scale-95 transition-all"
                   >
-                    <Share2 className="w-4 h-4" /> Exportar / Compartir
+                    <FileDown className="w-4 h-4" /> Exportar a PDF
                   </button>
                 </div>
                 
                 {/* Filters */}
-                <div className="flex flex-col lg:flex-row gap-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 p-3 rounded-2xl shadow-sm">
-                  <div className="flex-1 min-w-0 flex flex-col">
+                <div className="flex flex-col lg:flex-row gap-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 p-3 rounded-2xl shadow-sm relative z-50">
+                  <div className="flex-[1.5] min-w-0 flex flex-col">
                     <span className="text-[10px] font-bold text-zinc-400 uppercase px-1 mb-1 truncate">Estado</span>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value as any)}
-                      className="w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none appearance-none cursor-pointer overflow-hidden text-ellipsis"
-                    >
-                      <option value="all">Todos los estados</option>
-                      <option value="held">Realizadas</option>
-                      <option value="cancelled_billed">No Realizadas (Se Cobra)</option>
-                      <option value="cancelled_unbilled">No Realizadas (No se Cobra)</option>
-                    </select>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                        className="w-full h-10 bg-zinc-100/50 dark:bg-zinc-800/80 px-3 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 border-none flex items-center justify-between shadow-sm cursor-pointer"
+                      >
+                        <span className="truncate">
+                          {filterStatuses.length === 0 ? 'Todos los estados' : filterStatuses.map(s => s === 'held' ? 'Realizadas' : s === 'cancelled_billed' ? 'Can. (Cobra)' : 'Can. (No Cobra)').join(', ')}
+                        </span>
+                        <div className="ml-2 text-zinc-400 shrink-0">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </div>
+                      </button>
+                      
+                      <AnimatePresence>
+                        {isStatusDropdownOpen && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-40" 
+                              onClick={() => setIsStatusDropdownOpen(false)}
+                            />
+                            <motion.div
+                              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-200/50 dark:border-white/10 overflow-hidden z-50 p-1"
+                            >
+                              {[
+                                { id: 'held', label: 'Realizadas' },
+                                { id: 'cancelled_billed', label: 'Canceladas (Cobra)' },
+                                { id: 'cancelled_unbilled', label: 'Canceladas (No Cobra)' }
+                              ].map(option => (
+                                <label 
+                                  key={option.id} 
+                                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700/50 cursor-pointer transition-colors"
+                                >
+                                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${filterStatuses.includes(option.id) ? 'bg-rose-500 border-rose-500 text-white' : 'border-zinc-300 dark:border-zinc-600 bg-transparent'}`}>
+                                    {filterStatuses.includes(option.id) && <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                                  </div>
+                                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{option.label}</span>
+                                  <input 
+                                    type="checkbox" 
+                                    className="hidden"
+                                    checked={filterStatuses.includes(option.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setFilterStatuses(prev => [...prev, option.id]);
+                                      else setFilterStatuses(prev => prev.filter(s => s !== option.id));
+                                    }}
+                                  />
+                                </label>
+                              ))}
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                   <div className="flex-[2] min-w-0 flex flex-col sm:flex-row gap-2">
                     <div className="flex-1 min-w-0 flex flex-col">
@@ -982,21 +1149,23 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  { (filterStatus !== 'all' || filterDateStart || filterDateEnd) && (
-                    <button
-                      onClick={() => { setFilterStatus('all'); setFilterDateStart(''); setFilterDateEnd(''); }}
-                      className="h-10 px-4 flex items-center justify-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
-                    >
-                      Limpiar
-                    </button>
+                  { (filterStatuses.length > 0 || filterDateStart || filterDateEnd) && (
+                    <div className="flex flex-col justify-end">
+                      <button
+                        onClick={() => { setFilterStatuses([]); setFilterDateStart(''); setFilterDateEnd(''); }}
+                        className="h-10 px-4 flex items-center justify-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
 
               {(() => {
                 let filteredSessions = sessions;
-                if (filterStatus !== 'all') {
-                  filteredSessions = filteredSessions.filter(s => s.status === filterStatus);
+                if (filterStatuses.length > 0) {
+                  filteredSessions = filteredSessions.filter(s => filterStatuses.includes(s.status));
                 }
                 if (filterDateStart) {
                   filteredSessions = filteredSessions.filter(s => s.date >= filterDateStart);
@@ -1064,32 +1233,42 @@ export default function App() {
                                 className="w-full max-w-full min-w-0 h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100 appearance-none overflow-hidden text-ellipsis"
                               />
                             </div>
-                            <div className="flex flex-col sm:flex-row bg-zinc-100 dark:bg-zinc-800/80 p-1 gap-1 rounded-xl">
+                            <div className="bg-zinc-100 dark:bg-zinc-800/80 p-1.5 rounded-[1.25rem] flex flex-col sm:flex-row gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-700/50">
                               <button
                                 type="button" onClick={() => setEditSessionStatus('held')}
-                                className={`flex-1 py-2 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}
+                                className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] text-center ${editSessionStatus === 'held' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                               >Realizada</button>
                               <button
                                 type="button" onClick={() => setEditSessionStatus('cancelled_billed')}
-                                className={`flex-1 py-1 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 leading-tight ${editSessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
+                                className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${editSessionStatus === 'cancelled_billed' ? 'bg-white dark:bg-zinc-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                               >
                                 <span className="block">No Realizada</span>
-                                <span className="block text-[8px] opacity-80">(Se cobra)</span>
+                                <span className="block text-[8px] sm:text-[9px] opacity-80 mt-0.5">(Se cobra)</span>
                               </button>
                               <button
                                 type="button" onClick={() => setEditSessionStatus('cancelled_unbilled')}
-                                className={`flex-1 py-1 px-1 text-[9px] font-bold uppercase rounded-lg transition-all flex flex-col justify-center items-center h-10 leading-tight ${editSessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500'}`}
+                                className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${editSessionStatus === 'cancelled_unbilled' ? 'bg-white dark:bg-zinc-700 shadow-sm text-rose-600 dark:text-rose-400' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                               >
                                 <span className="block">No Realizada</span>
-                                <span className="block text-[8px] opacity-80">(No cobra)</span>
+                                <span className="block text-[8px] sm:text-[9px] opacity-80 mt-0.5">(No cobra)</span>
                               </button>
                             </div>
                             {editSessionStatus === 'held' ? (
-                              <input
-                                type="number" min="0" required placeholder="Nº de Asistentes"
-                                value={editSessionAttendees} onChange={(e) => setEditSessionAttendees(e.target.value)}
-                                className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
-                              />
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAttendeesModal('edit')}
+                                  className="w-full h-10 flex items-center justify-between px-3 bg-zinc-100/50 dark:bg-zinc-800/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-colors"
+                                >
+                                  <span>{editSessionAttendeeIds.length > 0 ? `${editSessionAttendeeIds.length} seleccionados` : 'Asistentes'}</span>
+                                  <User className="w-3.5 h-3.5" />
+                                </button>
+                                <input
+                                  type="text" placeholder="Notas"
+                                  value={editSessionNotes} onChange={(e) => setEditSessionNotes(e.target.value)}
+                                  className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                                />
+                              </div>
                             ) : (
                               <input
                                 type="text" required placeholder="Motivo"
@@ -1117,7 +1296,7 @@ export default function App() {
                             <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
                               <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
                                 <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">{new Date(session.date).toLocaleDateString('es-ES', { month: 'short' })}</span>
-                                <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{new Date(session.date).getDate()}</span>
+                                <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">{activity?.paymentType === 'monthly' ? new Date(session.date).getFullYear() : new Date(session.date).getDate()}</span>
                               </div>
                               <div>
                                 <h4 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base leading-tight">
@@ -1129,20 +1308,32 @@ export default function App() {
                                       <MapPin className="w-3 h-3 mr-1" /> {activity.location}
                                     </span>
                                   )}
-                                  {session.status === 'held' && session.attendeesCount !== undefined && (
-                                    <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center">
-                                      <User className="w-3 h-3 mx-1" /> {session.attendeesCount}
-                                    </span>
+                                  {session.status === 'held' && session.attendeeIds && session.attendeeIds.length > 0 && (
+                                    <div className="relative group/attendees flex items-center">
+                                      <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center cursor-help">
+                                        <User className="w-3 h-3 mx-1" /> {session.attendeeIds.length}
+                                      </span>
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] p-2 bg-zinc-900 dark:bg-white text-zinc-100 dark:text-zinc-900 text-xs rounded-xl shadow-xl opacity-0 invisible group-hover/attendees:opacity-100 group-hover/attendees:visible transition-all z-20 pointer-events-none">
+                                        <div className="font-bold mb-1 border-b border-zinc-700 dark:border-zinc-200 pb-1">Asistentes:</div>
+                                        <div className="flex flex-col gap-0.5 mt-1 max-h-32 overflow-y-auto hidden-scrollbar">
+                                          {session.attendeeIds.map(id => {
+                                            const student = students.find(s => s.id === id);
+                                            return <span key={id} className="truncate">{student?.name || 'Alumno eliminado'}</span>
+                                          })}
+                                        </div>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-zinc-900 dark:border-t-white"></div>
+                                      </div>
+                                    </div>
                                   )}
                                   
                                   {session.status === 'held' && (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizada</span>
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">Realizadas</span>
                                   )}
                                   {session.status === 'cancelled_billed' && (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Cobrada</span>
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Canceladas (Cobra)</span>
                                   )}
                                   {session.status === 'cancelled_unbilled' && (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">No Cobrada</span>
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">Canceladas (No Cobra)</span>
                                   )}
                                 </div>
                                 {session.justification && (
@@ -1155,17 +1346,17 @@ export default function App() {
                             
                             <div className="flex items-center justify-between sm:flex-col sm:items-end pl-14 sm:pl-0 pt-3 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/50 sm:border-0 relative">
                               {activity ? (
-                                activity.paymentType === 'monthly' ? (
+                                session.status === 'cancelled_unbilled' ? (
+                                  <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">-</div>
+                                ) : activity.paymentType === 'monthly' ? (
                                   <div className="text-base sm:text-lg font-black text-zinc-400 dark:text-zinc-600 mt-2 sm:mt-0">Mensual</div>
-                                ) : session.status !== 'cancelled_unbilled' ? (
+                                ) : (
                                   <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
                                     +{activity.pricePerClass.toFixed(2)}€
                                   </div>
-                                ) : (
-                                  <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">0.00€</div>
                                 )
                               ) : (
-                                <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">0.00€</div>
+                                <div className="text-base sm:text-lg font-black text-zinc-300 dark:text-zinc-700 mt-2 sm:mt-0">-</div>
                               )}
                             </div>
                             
@@ -1195,6 +1386,110 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+        {/* Attendees Modal */}
+        <AnimatePresence>
+          {showAttendeesModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: 10, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.95, y: 10, opacity: 0 }}
+                className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+              >
+                <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Asistentes</h3>
+                  <button onClick={() => setShowAttendeesModal(null)} className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-4 flex-1 overflow-y-auto">
+                  <div className="flex gap-2 mb-6">
+                    <input
+                      type="text"
+                      placeholder="Nuevo asistente..."
+                      value={newStudentName}
+                      onChange={(e) => setNewStudentName(e.target.value)}
+                      className="flex-1 bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-rose-500/50 text-zinc-900 dark:text-zinc-100 text-sm font-medium"
+                    />
+                    <button 
+                      onClick={() => {
+                        if (newStudentName.trim()) {
+                          const id = crypto.randomUUID();
+                          addStudent({ id, name: newStudentName.trim() });
+                          setNewStudentName('');
+                          if (showAttendeesModal === 'create') {
+                            setSessionAttendeeIds([...sessionAttendeeIds, id]);
+                          } else {
+                            setEditSessionAttendeeIds([...editSessionAttendeeIds, id]);
+                          }
+                        }
+                      }}
+                      className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-3 rounded-xl font-bold flex items-center justify-center transition-transform active:scale-95"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {students.length === 0 ? (
+                      <p className="text-center text-sm text-zinc-500 py-4 font-medium">No hay alumnos aún. Crealos arriba.</p>
+                    ) : (
+                      students.map(student => {
+                        const isSelected = showAttendeesModal === 'create' 
+                          ? sessionAttendeeIds.includes(student.id)
+                          : editSessionAttendeeIds.includes(student.id);
+                          
+                        return (
+                          <div key={student.id} className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-800/20">
+                            <button
+                              onClick={() => {
+                                if (showAttendeesModal === 'create') {
+                                  setSessionAttendeeIds(prev => isSelected ? prev.filter(id => id !== student.id) : [...prev, student.id]);
+                                } else {
+                                  setEditSessionAttendeeIds(prev => isSelected ? prev.filter(id => id !== student.id) : [...prev, student.id]);
+                                }
+                              }}
+                              className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center transition-colors border ${isSelected ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'}`}
+                            >
+                              {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                            </button>
+                            <span className="flex-1 font-medium text-base text-zinc-900 dark:text-zinc-100">{student.name}</span>
+                            <button 
+                              onClick={() => {
+                              deleteStudent(student.id);
+                              setSessionAttendeeIds(prev => prev.filter(id => id !== student.id));
+                              setEditSessionAttendeeIds(prev => prev.filter(id => id !== student.id));
+                            }}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                
+                <div className="p-6 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/30">
+                  <button 
+                    onClick={() => setShowAttendeesModal(null)}
+                    className="w-full py-4 bg-rose-500 text-white font-bold rounded-2xl shadow-lg shadow-rose-500/20 active:scale-[0.98] transition-transform"
+                  >
+                    Terminar Selección
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
     </div>
   );
 }
