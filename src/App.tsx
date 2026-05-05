@@ -77,7 +77,11 @@ const ProfileView = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setProfile(editProfile);
-    localStorage.setItem("danceflow_profile", JSON.stringify(editProfile));
+    try {
+      localStorage.setItem("danceflow_profile", JSON.stringify(editProfile));
+    } catch (e) {
+      alert("Error al guardar: la imagen de perfil podría ser demasiado pesada. El navegador no permite guardar archivos grandes. Por favor intenta con una imagen de menor tamaño.");
+    }
     setIsEditing(false);
   };
 
@@ -93,7 +97,11 @@ const ProfileView = ({
     }
     const newProf = { ...profile, password: passwordState.new };
     setProfile(newProf);
-    localStorage.setItem("danceflow_profile", JSON.stringify(newProf));
+    try {
+      localStorage.setItem("danceflow_profile", JSON.stringify(newProf));
+    } catch (e) {
+      alert("Error al guardar en el almacenamiento local. Posiblemente falta de espacio.");
+    }
     setPasswordSuccess(true);
     setTimeout(() => {
       setShowPasswordChange(false);
