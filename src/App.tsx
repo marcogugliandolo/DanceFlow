@@ -9,6 +9,401 @@ import Holidays from "date-holidays";
 
 const hd = new Holidays("ES");
 
+const ProfileView = ({
+  isDarkMode,
+  setIsDarkMode,
+  profile,
+  setProfile,
+}: {
+  isDarkMode: boolean;
+  setIsDarkMode: (v: boolean) => void;
+  profile: any;
+  setProfile: (p: any) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editProfile, setEditProfile] = useState(profile);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordState, setPasswordState] = useState({
+    current: "",
+    new: "",
+    confirm: "",
+  });
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditProfile({ ...editProfile, avatarUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfile(editProfile);
+    localStorage.setItem("danceflow_profile", JSON.stringify(editProfile));
+    setIsEditing(false);
+  };
+
+  const handlePasswordSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordState.current !== profile.password) {
+      alert("La contraseña actual no es correcta.");
+      return;
+    }
+    if (passwordState.new !== passwordState.confirm) {
+      alert("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+    const newProf = { ...profile, password: passwordState.new };
+    setProfile(newProf);
+    localStorage.setItem("danceflow_profile", JSON.stringify(newProf));
+    setPasswordSuccess(true);
+    setTimeout(() => {
+      setShowPasswordChange(false);
+      setPasswordSuccess(false);
+      setPasswordState({ current: "", new: "", confirm: "" });
+    }, 2000);
+  };
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportData = () => {
+    const data = localStorage.getItem("danceflow_data");
+    const profileData = localStorage.getItem("danceflow_profile");
+
+    const exportObject = {
+      danceflow_data: data ? JSON.parse(data) : null,
+      danceflow_profile: profileData ? JSON.parse(profileData) : null,
+      exportDate: new Date().toISOString(),
+    };
+
+    const dataStr =
+      "data:text/json;charset=utf-8," +
+      encodeURIComponent(JSON.stringify(exportObject, null, 2));
+    const downloadAnchorNode = document.createElement("a");
+    downloadAnchorNode.setAttribute("href", dataStr);
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    downloadAnchorNode.setAttribute(
+      "download",
+      `danceflow_backup_${dateStr}.json`,
+    );
+    document.body.appendChild(downloadAnchorNode); // required for firefox
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const result = event.target?.result as string;
+        const parsed = JSON.parse(result);
+
+        if (parsed.danceflow_data !== undefined) {
+          if (parsed.danceflow_data !== null) {
+            localStorage.setItem(
+              "danceflow_data",
+              JSON.stringify(parsed.danceflow_data),
+            );
+          }
+          if (
+            parsed.danceflow_profile !== undefined &&
+            parsed.danceflow_profile !== null
+          ) {
+            localStorage.setItem(
+              "danceflow_profile",
+              JSON.stringify(parsed.danceflow_profile),
+            );
+          }
+          alert(
+            "Datos importados correctamente. La página se recargará para aplicar los cambios.",
+          );
+          window.location.reload();
+        } else {
+          alert("El archivo no tiene el formato correcto.");
+        }
+      } catch (err) {
+        alert("Error al leer el archivo. Asegúrate de que sea un JSON válido.");
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="flex flex-col mb-6 gap-6 px-1 sm:px-2 max-w-2xl mx-auto">
+      <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-6 sm:p-8 shadow-sm flex flex-col gap-8">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
+          <div className="relative group flex-shrink-0">
+            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-800 dark:to-zinc-900 shadow-xl border-4 border-white dark:border-zinc-800 flex items-center justify-center text-5xl sm:text-6xl font-black text-rose-500 transition-transform duration-300 group-hover:scale-105">
+              {profile.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-12 h-12 sm:w-16 sm:h-16 text-rose-500 opacity-80" />
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col gap-1 w-full text-center sm:text-left mt-2">
+            {!isEditing ? (
+              <>
+                <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white break-words">
+                  {profile.name}
+                </h3>
+                <p className="text-sm font-medium text-zinc-500 break-all">
+                  {profile.email}
+                </p>
+                <div className="mt-5 flex justify-center sm:justify-start">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-6 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-bold rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 border border-zinc-200/80 dark:border-zinc-700/80 shadow-sm"
+                  >
+                    Editar Perfil
+                  </button>
+                </div>
+              </>
+            ) : (
+              <form
+                onSubmit={handleSave}
+                className="flex flex-col gap-3 w-full animate-in fade-in zoom-in-95 duration-200"
+              >
+                <input
+                  type="text"
+                  value={editProfile.name}
+                  onChange={(e) =>
+                    setEditProfile({ ...editProfile, name: e.target.value })
+                  }
+                  className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                  placeholder="Nombre"
+                  required
+                />
+                <input
+                  type="email"
+                  value={editProfile.email}
+                  onChange={(e) =>
+                    setEditProfile({ ...editProfile, email: e.target.value })
+                  }
+                  className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                  placeholder="Correo electrónico"
+                  required
+                />
+                <div className="flex flex-col gap-1 w-full max-w-full">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase px-1">
+                    Foto de perfil
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full max-w-full h-auto min-h-[40px] bg-zinc-100 dark:bg-zinc-800 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 dark:file:bg-rose-500/20 dark:file:text-rose-400 dark:hover:file:bg-rose-500/30 whitespace-normal break-all"
+                  />
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditProfile(profile);
+                    }}
+                    className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold rounded-xl active:scale-95 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-xs font-bold rounded-xl shadow-md active:scale-95 transition-all"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-2">
+          Configuración y Seguridad
+        </h3>
+
+        <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-6 shadow-sm flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                Modo Oscuro
+              </span>
+              <span className="text-xs text-zinc-500">
+                Alternar entre tema claro y oscuro
+              </span>
+            </div>
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`w-12 h-6 rounded-full transition-colors relative ${isDarkMode ? "bg-rose-500" : "bg-zinc-300 dark:bg-zinc-600"}`}
+            >
+              <div
+                className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${isDarkMode ? "translate-x-7" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+
+          <div className="h-px bg-zinc-200/50 dark:bg-white/5 w-full my-2" />
+
+          {!showPasswordChange ? (
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                  Contraseña de acceso
+                </span>
+                <span className="text-xs text-zinc-500">
+                  Cambia la contraseña para acceder a la app
+                </span>
+              </div>
+              <button
+                onClick={() => setShowPasswordChange(true)}
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all border border-zinc-200 dark:border-zinc-700"
+              >
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={handlePasswordSave}
+              className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2"
+            >
+              <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2">
+                Cambiar Contraseña
+              </h4>
+              <input
+                type="password"
+                value={passwordState.current}
+                onChange={(e) =>
+                  setPasswordState({
+                    ...passwordState,
+                    current: e.target.value,
+                  })
+                }
+                placeholder="Contraseña actual"
+                className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                required
+              />
+              <input
+                type="password"
+                value={passwordState.new}
+                onChange={(e) =>
+                  setPasswordState({ ...passwordState, new: e.target.value })
+                }
+                placeholder="Nueva contraseña"
+                className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                required
+                minLength={4}
+              />
+              <input
+                type="password"
+                value={passwordState.confirm}
+                onChange={(e) =>
+                  setPasswordState({
+                    ...passwordState,
+                    confirm: e.target.value,
+                  })
+                }
+                placeholder="Confirmar nueva contraseña"
+                className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                required
+                minLength={4}
+              />
+              {passwordSuccess && (
+                <p className="text-emerald-500 text-xs font-bold">
+                  ¡Contraseña actualizada!
+                </p>
+              )}
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordChange(false);
+                    setPasswordState({ current: "", new: "", confirm: "" });
+                  }}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-xl"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="h-px bg-zinc-200/50 dark:bg-white/5 w-full my-2" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                Exportar datos
+              </span>
+              <span className="text-xs text-zinc-500">
+                Descarga un archivo con toda tu información
+              </span>
+            </div>
+            <button
+              onClick={handleExportData}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all border border-zinc-200 dark:border-zinc-700"
+            >
+              Exportar
+            </button>
+          </div>
+
+          <div className="h-px bg-zinc-200/50 dark:bg-white/5 w-full my-2" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                Importar datos
+              </span>
+              <span className="text-xs text-zinc-500">
+                Restaura información desde una copia de seguridad
+              </span>
+            </div>
+            <div>
+              <input
+                type="file"
+                accept=".json"
+                ref={fileInputRef}
+                onChange={handleImportData}
+                style={{ display: "none" }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all border border-zinc-200 dark:border-zinc-700"
+              >
+                Importar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 import {
   CalendarDays,
   CheckCircle2,
@@ -34,6 +429,7 @@ import {
   Share2,
   FileDown,
   Clock,
+  CircleUserRound,
 } from "lucide-react";
 
 const cardVariants = {
@@ -54,6 +450,18 @@ const containerVariants = {
 };
 
 export default function App() {
+  const [profile, setProfile] = useState(() => {
+    const saved = localStorage.getItem("danceflow_profile");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          name: "Profesor",
+          email: "profesor@ejemplo.com",
+          avatarUrl: "",
+          password: "password123",
+        };
+  });
+
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem("auth_danceflow") === "true";
   });
@@ -83,9 +491,9 @@ export default function App() {
     deleteStudent,
   } = useDanceStore(dashboardMonth);
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "historial">(
-    "dashboard",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "dashboard" | "historial" | "perfil"
+  >("dashboard");
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Attempt to load dark mode preference, default to dark if not set
     const saved = localStorage.getItem("theme_danceflow");
@@ -170,7 +578,10 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.toLowerCase() === "ana" && password === "salsanova") {
+    if (
+      username.toLowerCase() === profile.name.toLowerCase() &&
+      password === profile.password
+    ) {
       setIsAuthenticated(true);
       localStorage.setItem("auth_danceflow", "true");
       setLoginError(false);
@@ -327,9 +738,8 @@ export default function App() {
       const query = sessionSearchQuery.toLowerCase().trim();
       filtered = filtered.filter((s) => {
         const actName =
-          activities
-            .find((a) => a.id === s.activityId)
-            ?.name?.toLowerCase() || "";
+          activities.find((a) => a.id === s.activityId)?.name?.toLowerCase() ||
+          "";
         const notes = s.notes?.toLowerCase() || "";
         const justification = s.justification?.toLowerCase() || "";
         return (
@@ -804,12 +1214,12 @@ export default function App() {
           </div>
 
           {/* Menú de pestañas */}
-          <div className="flex w-full sm:w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-2xl sm:rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md">
-            {(["dashboard", "historial"] as const).map((tab) => (
+          <div className="flex w-full sm:w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-2xl sm:rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
+            {(["dashboard", "historial", "perfil"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`relative flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-2 text-sm font-bold sm:font-semibold rounded-xl sm:rounded-full outline-none transition-colors ${
+                className={`group relative flex-1 sm:flex-none px-2 sm:px-6 py-2 text-xs sm:text-[13px] font-bold sm:font-semibold rounded-xl sm:rounded-full outline-none transition-all ${
                   activeTab === tab
                     ? "text-zinc-900 dark:text-white"
                     : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -826,13 +1236,21 @@ export default function App() {
                     }}
                   />
                 )}
-                <span className="relative z-10 flex items-center justify-center gap-2 capitalize">
+                <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 capitalize">
                   {tab === "dashboard" ? (
-                    <LayoutDashboard className="w-4 h-4 sm:hidden" />
+                    <LayoutDashboard className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
+                  ) : tab === "historial" ? (
+                    <History className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
+                  ) : profile.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt="Avatar"
+                      className="w-5 h-5 rounded-full object-cover shadow-sm border border-zinc-200 dark:border-zinc-700"
+                    />
                   ) : (
-                    <History className="w-4 h-4 sm:hidden" />
+                    <CircleUserRound className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   )}
-                  {tab}
+                  <span className="truncate">{tab}</span>
                 </span>
               </button>
             ))}
@@ -1627,7 +2045,7 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
-          ) : (
+          ) : activeTab === "historial" ? (
             <motion.div
               key="historial"
               initial={{ opacity: 0, y: 15 }}
@@ -2318,7 +2736,22 @@ export default function App() {
                 })()}
               </div>
             </motion.div>
-          )}
+          ) : activeTab === "perfil" ? (
+            <motion.div
+              key="perfil"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ProfileView
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setIsDarkMode}
+                profile={profile}
+                setProfile={setProfile}
+              />
+            </motion.div>
+          ) : null}
         </AnimatePresence>
       </main>
 
