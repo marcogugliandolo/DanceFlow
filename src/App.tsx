@@ -156,7 +156,7 @@ export default function App() {
   const [filterDateEnd, setFilterDateEnd] = useState("");
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [sessionCurrentPage, setSessionCurrentPage] = useState(1);
-  const SESSIONS_PER_PAGE = 10;
+  const SESSIONS_PER_PAGE = 6;
 
   useEffect(() => {
     if (isDarkMode) {
@@ -323,6 +323,22 @@ export default function App() {
       filtered = filtered.filter((s) => s.date >= filterDateStart);
     if (filterDateEnd)
       filtered = filtered.filter((s) => s.date <= filterDateEnd);
+    if (sessionSearchQuery.trim()) {
+      const query = sessionSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter((s) => {
+        const actName =
+          activities
+            .find((a) => a.id === s.activityId)
+            ?.name?.toLowerCase() || "";
+        const notes = s.notes?.toLowerCase() || "";
+        const justification = s.justification?.toLowerCase() || "";
+        return (
+          actName.includes(query) ||
+          notes.includes(query) ||
+          justification.includes(query)
+        );
+      });
+    }
 
     if (filtered.length === 0) {
       doc.setFontSize(12);
