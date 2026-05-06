@@ -217,7 +217,7 @@ export function useDanceStore(selectedMonth?: string) {
         // Calculate revenue based on payment type
         let sessionRevenue = 0;
         if (activity.paymentType !== 'monthly') {
-          sessionRevenue = activity.pricePerClass;
+          sessionRevenue = activity.pricePerClass * (session.duration ?? 1);
         }
         
         stats.totalHeld++;
@@ -237,7 +237,7 @@ export function useDanceStore(selectedMonth?: string) {
         if (session.status === 'cancelled_billed') {
           let cancelRevenue = 0;
           if (activity.paymentType !== 'monthly') {
-             cancelRevenue = activity.pricePerClass;
+             cancelRevenue = activity.pricePerClass * (session.duration ?? 1);
           }
 
           stats.totalBilled++;

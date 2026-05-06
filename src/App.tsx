@@ -932,7 +932,7 @@ export default function App() {
       if (!activity) return;
       if (activity.paymentType !== "monthly") {
         if (s.status === "held" || s.status === "cancelled_billed") {
-          totalRevenue += activity.pricePerClass;
+          totalRevenue += activity.pricePerClass * (s.duration ?? 1);
         }
       }
     });
@@ -958,9 +958,9 @@ export default function App() {
 
       let amount = 0;
       if (activity.paymentType !== "monthly") {
-        if (s.status === "held") amount = activity.pricePerClass;
+        if (s.status === "held") amount = activity.pricePerClass * (s.duration ?? 1);
         else if (s.status === "cancelled_billed")
-          amount = activity.pricePerClass;
+          amount = activity.pricePerClass * (s.duration ?? 1);
       }
 
       if (!groupedMap.has(activity.id)) {
@@ -2979,7 +2979,7 @@ export default function App() {
                                       </div>
                                     ) : (
                                       <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
-                                        +{activity.pricePerClass.toFixed(2)}€
+                                        +{(activity.pricePerClass * (session.duration ?? 1)).toFixed(2)}€
                                       </div>
                                     )
                                   ) : (
