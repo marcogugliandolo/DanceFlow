@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Activity, ClassSession, SummaryStats, ActivityStats, Student } from '../types';
 
 export function useDanceStore(selectedMonth?: string) {
@@ -31,7 +31,7 @@ export function useDanceStore(selectedMonth?: string) {
 
   const lastLocalUpdate = useRef<number>(0);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     // Don't poll if we just updated locally in the last 3 seconds
     if (Date.now() - lastLocalUpdate.current < 3000) {
       return;
@@ -55,7 +55,7 @@ export function useDanceStore(selectedMonth?: string) {
     } catch (err) {
       console.error("Failed to fetch from server", err);
     }
-  };
+  }, []);
 
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {

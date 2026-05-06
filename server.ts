@@ -119,8 +119,8 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
-    sameSite: 'lax',
+    secure: true, // Always true for HTTPS (AI Studio)
+    sameSite: 'none',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
 }));
@@ -442,21 +442,31 @@ app.post("/api/activities", requireAuth, (req, res) => {
   const activities = req.body;
   const insert = db.prepare("INSERT OR REPLACE INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   
-  db.transaction(() => {
-    for (const a of activities) {
-      insert.run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
-    }
-  })();
-  res.json({ success: true });
+  try {
+    db.transaction(() => {
+      for (const a of activities) {
+        insert.run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+      }
+    })();
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST activities bulk error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
 });
 
 // Update or add single activity
 app.post("/api/activities/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const a = req.body;
-  db.prepare("INSERT OR REPLACE INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
-  res.json({ success: true });
+  try {
+    db.prepare("INSERT OR REPLACE INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST activity error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
 });
 
 app.delete("/api/activities/:id", requireAuth, (req, res) => {
