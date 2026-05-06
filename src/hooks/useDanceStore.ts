@@ -31,34 +31,34 @@ export function useDanceStore(selectedMonth?: string) {
 
   const lastLocalUpdate = useRef<number>(0);
 
+  const fetchData = async () => {
+    // Don't poll if we just updated locally in the last 3 seconds
+    if (Date.now() - lastLocalUpdate.current < 3000) {
+      return;
+    }
+
+    try {
+      const [actRes, sesRes, stuRes] = await Promise.all([
+        fetch('/api/activities', { cache: 'no-store' }),
+        fetch('/api/sessions', { cache: 'no-store' }),
+        fetch('/api/students', { cache: 'no-store' })
+      ]);
+      if (actRes.ok && sesRes.ok && stuRes.ok) {
+        const acts = await actRes.json();
+        const sessRaw = await sesRes.json();
+        const stus = await stuRes.json();
+
+        setActivities(acts);
+        setSessions(sessRaw);
+        setStudents(stus);
+      }
+    } catch (err) {
+      console.error("Failed to fetch from server", err);
+    }
+  };
+
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
-    const fetchData = async () => {
-      // Don't poll if we just updated locally in the last 3 seconds
-      if (Date.now() - lastLocalUpdate.current < 3000) {
-        return;
-      }
-
-      try {
-        const [actRes, sesRes, stuRes] = await Promise.all([
-          fetch('/api/activities', { cache: 'no-store' }),
-          fetch('/api/sessions', { cache: 'no-store' }),
-          fetch('/api/students', { cache: 'no-store' })
-        ]);
-        if (actRes.ok && sesRes.ok && stuRes.ok) {
-          const acts = await actRes.json();
-          const sessRaw = await sesRes.json();
-          const stus = await stuRes.json();
-
-          setActivities(acts);
-          setSessions(sessRaw);
-          setStudents(stus);
-        }
-      } catch (err) {
-        console.error("Failed to fetch from server", err);
-      }
-    };
-    
     // Initial fetch
     fetchData();
     
@@ -272,5 +272,6 @@ export function useDanceStore(selectedMonth?: string) {
     addStudent,
     editStudent,
     deleteStudent,
+    fetchData,
   };
 }
