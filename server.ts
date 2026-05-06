@@ -294,7 +294,12 @@ app.get("/api/export", requireAuth, (req, res) => {
 
 app.post("/api/import", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
-  const { activities, sessions, students } = req.body;
+  const { activities, sessions, students, dance_activities, dance_sessions, dance_students } = req.body;
+  
+  const activitiesToImport = activities || dance_activities;
+  const sessionsToImport = sessions || dance_sessions;
+  const studentsToImport = students || dance_students;
+
   try {
     db.transaction(() => {
       // Clear existing data for this user
@@ -303,31 +308,32 @@ app.post("/api/import", requireAuth, (req, res) => {
       db.prepare("DELETE FROM students WHERE user_id = ?").run(user.id);
 
       // Import activities
-      if (activities && Array.isArray(activities)) {
+      if (activitiesToImport && Array.isArray(activitiesToImport)) {
         const insAct = db.prepare("INSERT INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        for (const a of activities) {
-          insAct.run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+        for (const a of activitiesToImport) {
+          insAct.run(a.id, user.id, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
         }
       }
 
       // Import sessions
-      if (sessions && Array.isArray(sessions)) {
+      if (sessionsToImport && Array.isArray(sessionsToImport)) {
         const insSes = db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        for (const s of sessions) {
-          insSes.run(s.id, user.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+        for (const s of sessionsToImport) {
+          insSes.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
         }
       }
 
       // Import students
-      if (students && Array.isArray(students)) {
+      if (studentsToImport && Array.isArray(studentsToImport)) {
         const insStu = db.prepare("INSERT INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)");
-        for (const s of students) {
-          insStu.run(s.id, user.id, s.name, s.phone || null, s.email || null, s.notes || null);
+        for (const s of studentsToImport) {
+          insStu.run(s.id, user.id, s.name || 'Estudiante sin nombre', s.phone || null, s.email || null, s.notes || null);
         }
       }
     })();
     res.json({ success: true });
   } catch (err: any) {
+    console.error("Import error:", err);
     res.status(500).json({ error: "Import Error", details: err.message });
   }
 });

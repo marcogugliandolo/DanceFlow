@@ -190,7 +190,8 @@ const ProfileView = ({
           alert("Datos importados correctamente. La página se recargará.");
           window.location.reload();
         } else {
-          alert("Error al importar datos");
+          const errData = await res.json().catch(() => ({}));
+          alert(`Error al importar datos: ${errData.details || errData.error || 'Desconocido'}`);
         }
       } catch (err) {
         alert("Archivo no válido");

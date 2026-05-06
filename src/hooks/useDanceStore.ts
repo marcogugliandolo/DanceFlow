@@ -18,15 +18,15 @@ export function useDanceStore(selectedMonth?: string) {
   });
 
   useEffect(() => {
-    // localStorage.setItem('dance_activities', JSON.stringify(activities));
+    localStorage.setItem('dance_activities', JSON.stringify(activities));
   }, [activities]);
 
   useEffect(() => {
-    // localStorage.setItem('dance_sessions', JSON.stringify(sessions));
+    localStorage.setItem('dance_sessions', JSON.stringify(sessions));
   }, [sessions]);
 
   useEffect(() => {
-    // localStorage.setItem('dance_students', JSON.stringify(students));
+    localStorage.setItem('dance_students', JSON.stringify(students));
   }, [students]);
 
   const lastLocalUpdate = useRef<number>(0);
