@@ -280,10 +280,19 @@ app.get("/api/export", requireAuth, (req, res) => {
     
     res.json({
       activities,
-      sessions: sessions.map((s: any) => ({
-        ...s,
-        attendeeIds: s.attendeeIds ? JSON.parse(s.attendeeIds) : []
-      })),
+      sessions: sessions.map((s: any) => {
+        let parsed = [];
+        if (s.attendeeIds) {
+          try {
+            parsed = JSON.parse(s.attendeeIds);
+            if (!Array.isArray(parsed)) parsed = [];
+          } catch(e) {}
+        }
+        return {
+          ...s,
+          attendeeIds: parsed
+        };
+      }),
       students,
       exportDate: new Date().toISOString()
     });
@@ -415,10 +424,22 @@ app.get("/api/sessions", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
   // Ensure attendeeIds is returned as an array or empty array if null
-  res.json(sessions.map((s: any) => ({
-    ...s,
-    attendeeIds: s.attendeeIds ? JSON.parse(s.attendeeIds) : []
-  })));
+  res.json(sessions.map((s: any) => {
+    let parsed = [];
+    if (s.attendeeIds) {
+      try {
+        parsed = JSON.parse(s.attendeeIds);
+        if (!Array.isArray(parsed)) parsed = [];
+      } catch(e) {
+        // Fallback for invalid JSON strings
+        parsed = [];
+      }
+    }
+    return {
+      ...s,
+      attendeeIds: parsed
+    };
+  }));
 });
 
 // Save all sessions
@@ -494,11 +515,37 @@ app.post("/api/external/clase", express.json(), (req, res) => {
     // Create session (use provided date or today)
     const sessionDate = date || new Date().toISOString().split('T')[0];
     const sessionId = crypto.randomUUID();
-    const sessionStatus = status || 'held';
+    
+    // Normalize status ("Realizada", "Completada" -> "held", others to lowercase or fallback)
+    let sessionStatus = 'held';
+    if (status) {
+      const sLower = status.toLowerCase().trim();
+      if (sLower === 'held' || sLower === 'realizada' || sLower === 'completada' || sLower === 'realizada') {
+        sessionStatus = 'held';
+      } else if (sLower === 'cancelled_billed' || sLower.includes('cobra')) {
+        sessionStatus = 'cancelled_billed';
+      } else if (sLower === 'cancelled_unbilled' || sLower.includes('no cobra') || sLower.includes('cancel')) {
+        sessionStatus = 'cancelled_unbilled';
+      } else {
+        sessionStatus = 'held';
+      }
+    }
+
     const duration = req.body.duration || 1;
+    
+    // Safe parse attendee ids
+    let parsedAttendeeIds: string[] = [];
+    if (Array.isArray(attendeeIds)) {
+        parsedAttendeeIds = attendeeIds;
+    } else if (typeof attendeeIds === 'string') {
+        try {
+            const parsed = JSON.parse(attendeeIds);
+            if (Array.isArray(parsed)) parsedAttendeeIds = parsed;
+        } catch(e) {}
+    }
 
     db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, notes, justification, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(sessionId, user.id, activity.id, sessionDate, sessionStatus, notes || attendeesCount?.toString() || null, justification || null, JSON.stringify(attendeeIds || []), duration);
+      .run(sessionId, user.id, activity.id, sessionDate, sessionStatus, notes || attendeesCount?.toString() || null, justification || null, JSON.stringify(parsedAttendeeIds), duration);
 
     res.json({
       success: true,

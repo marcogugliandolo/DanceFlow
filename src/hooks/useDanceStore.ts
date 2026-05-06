@@ -55,21 +55,22 @@ export function useDanceStore(selectedMonth?: string) {
           const localSess = JSON.parse(localStorage.getItem('dance_sessions') || '[]');
           const localStus = JSON.parse(localStorage.getItem('dance_students') || '[]');
 
-          if (acts.length === 0 && sessRaw.length === 0 && stus.length === 0 && 
-              (localActs.length > 0 || localSess.length > 0 || localStus.length > 0)) {
-            
-            // Push local data to the server
-            if (localActs.length > 0) await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localActs) });
-            if (localSess.length > 0) await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localSess) });
-            if (localStus.length > 0) await fetch('/api/students', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localStus) });
-            
-            setActivities(localActs);
-            setSessions(localSess);
-            setStudents(localStus);
-            
-            // Clear local storage after successful migration to prevent re-migrating? 
-            // Or just keep it as backup. We'll leave it for now but the server will have data next time.
-            return;
+          let didMigrate = false;
+          
+          if (acts.length === 0 && localActs.length > 0) {
+            await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localActs) });
+            acts.push(...localActs);
+            didMigrate = true;
+          }
+          if (sessRaw.length === 0 && localSess.length > 0) {
+            await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localSess) });
+            sessRaw.push(...localSess);
+            didMigrate = true;
+          }
+          if (stus.length === 0 && localStus.length > 0) {
+            await fetch('/api/students', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localStus) });
+            stus.push(...localStus);
+            didMigrate = true;
           }
 
           setActivities(acts);
