@@ -1138,27 +1138,58 @@ export default function App() {
       0,
     );
 
+    const hoursPerAct = Array.from(groupedMap.values())
+      .filter((g) => g.totalHours > 0)
+      .map((g) => `• ${g.activity.name}: ${g.totalHours} h`);
+
+    const hoursLinesCount = hoursPerAct.length;
+    const additionalHeight = hoursLinesCount > 0 ? (hoursLinesCount * 5) + 2 : 0;
+    const summaryBoxHeight = 55 + additionalHeight;
+
+    let summaryStartY = finalY + 10;
+
+    // Check if summary box fits on the current page
+    if (summaryStartY + summaryBoxHeight > doc.internal.pageSize.getHeight() - 10) {
+      doc.addPage();
+      summaryStartY = 10;
+    }
+
     // Summary Box
     doc.setFillColor(245, 245, 247);
-    doc.roundedRect(14, finalY + 10, 182, 55, 3, 3, "F");
+    doc.roundedRect(14, summaryStartY, 182, summaryBoxHeight, 3, 3, "F");
 
     doc.setFontSize(12);
     doc.setTextColor(30, 30, 30);
     doc.setFont("helvetica", "bold");
-    doc.text("Resumen del Periodo", 20, finalY + 20);
+    doc.text("Resumen del Periodo", 20, summaryStartY + 10);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(
       `Total de sesiones en el registro: ${filtered.length}`,
       20,
-      finalY + 28,
+      summaryStartY + 18,
     );
-    doc.text(`Total de horas: ${globalTotalHours} h`, 20, finalY + 34);
+    doc.text(`Total de horas: ${globalTotalHours} h`, 20, summaryStartY + 24);
+
+    let currentY = summaryStartY + 30;
+
+    if (hoursLinesCount > 0) {
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      hoursPerAct.forEach((line) => {
+        doc.text(line, 25, currentY);
+        currentY += 5;
+      });
+      currentY += 2; // Extra padding
+    }
+
+    doc.setFontSize(10);
+    doc.setTextColor(30, 30, 30);
     doc.text(
       `Ingresos por sesiones individuales: ${totalRevenue.toFixed(2)}€`,
       20,
-      finalY + 40,
+      currentY,
     );
 
     const totalMonthlyText = monthlyRec + monthlyNonRec;
@@ -1166,7 +1197,7 @@ export default function App() {
       doc.text(
         `Cuotas mensuales${numMonths > 1 ? ` (${numMonths} meses)` : ""}: +${totalMonthlyText.toFixed(2)}€`,
         20,
-        finalY + 46,
+        currentY + 6,
       );
     }
 
@@ -1176,7 +1207,7 @@ export default function App() {
     doc.text(
       `Total Periodo: ${totalWithMonthly.toFixed(2)}€`,
       130,
-      finalY + 46,
+      currentY + 6,
     );
 
     const currentDate = new Date();
