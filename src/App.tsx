@@ -74,102 +74,130 @@ const ProfileView = ({
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile(editProfile);
-    setIsEditing(false);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editProfile,
+          theme: isDarkMode ? 'dark' : 'light'
+        })
+      });
+      if (res.ok) {
+        const { user } = await res.json();
+        setProfile({
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatar_url || "",
+          theme: user.theme || "dark",
+        });
+        setIsEditing(false);
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
+    }
   };
 
-  const handlePasswordSave = (e: React.FormEvent) => {
+  const toggleTheme = async () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    try {
+      await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...profile,
+          theme: nextMode ? 'dark' : 'light'
+        })
+      });
+    } catch (e) {}
+  };
+
+  const handlePasswordSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordState.current !== profile.password) {
-      alert("La contraseña actual no es correcta.");
-      return;
-    }
     if (passwordState.new !== passwordState.confirm) {
       alert("Las contraseñas nuevas no coinciden.");
       return;
     }
-    const newProf = { ...profile, password: passwordState.new };
-    setProfile(newProf);
-    setPasswordSuccess(true);
-    setTimeout(() => {
-      setShowPasswordChange(false);
-      setPasswordSuccess(false);
-      setPasswordState({ current: "", new: "", confirm: "" });
-    }, 2000);
+    try {
+      const res = await fetch('/api/profile/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordState.current,
+          newPassword: passwordState.new
+        })
+      });
+      if (res.ok) {
+        setPasswordSuccess(true);
+        setTimeout(() => {
+          setShowPasswordChange(false);
+          setPasswordSuccess(false);
+          setPasswordState({ current: "", new: "", confirm: "" });
+        }, 2000);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Error al cambiar la contraseña");
+      }
+    } catch (err) {
+      alert("Error de conexión");
+    }
   };
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleExportData = () => {
-    const data = localStorage.getItem("danceflow_data");
-    const profileData = localStorage.getItem("danceflow_profile");
-
-    const exportObject = {
-      danceflow_data: data ? JSON.parse(data) : null,
-      danceflow_profile: profileData ? JSON.parse(profileData) : null,
-      exportDate: new Date().toISOString(),
-    };
-
-    const dataStr =
-      "data:text/json;charset=utf-8," +
-      encodeURIComponent(JSON.stringify(exportObject, null, 2));
-    const downloadAnchorNode = document.createElement("a");
-    downloadAnchorNode.setAttribute("href", dataStr);
-
-    const dateObj = new Date();
-    const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}_${String(dateObj.getMonth() + 1).padStart(2, "0")}_${dateObj.getFullYear()}`;
-    downloadAnchorNode.setAttribute(
-      "download",
-      `salsanova_backup_${dateStr}.json`,
-    );
-    document.body.appendChild(downloadAnchorNode); // required for firefox
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+  const handleExportData = async () => {
+    try {
+      const res = await fetch('/api/export');
+      if (res.ok) {
+        const data = await res.json();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchorNode = document.createElement("a");
+        downloadAnchorNode.setAttribute("href", dataStr);
+        const dateObj = new Date();
+        const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}_${String(dateObj.getMonth() + 1).padStart(2, "0")}_${dateObj.getFullYear()}`;
+        downloadAnchorNode.setAttribute("download", `salsanova_db_export_${dateStr}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      }
+    } catch (err) {
+      alert("Error al exportar datos");
+    }
   };
 
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const result = event.target?.result as string;
         const parsed = JSON.parse(result);
 
-        if (parsed.danceflow_data !== undefined) {
-          if (parsed.danceflow_data !== null) {
-            localStorage.setItem(
-              "danceflow_data",
-              JSON.stringify(parsed.danceflow_data),
-            );
-          }
-          if (
-            parsed.danceflow_profile !== undefined &&
-            parsed.danceflow_profile !== null
-          ) {
-            localStorage.setItem(
-              "danceflow_profile",
-              JSON.stringify(parsed.danceflow_profile),
-            );
-          }
-          alert(
-            "Datos importados correctamente. La página se recargará para aplicar los cambios.",
-          );
+        if (!confirm("¿Estás seguro? Esto reemplazará todos los datos actuales.")) return;
+
+        const res = await fetch('/api/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parsed)
+        });
+
+        if (res.ok) {
+          alert("Datos importados correctamente. La página se recargará.");
           window.location.reload();
         } else {
-          alert("El archivo no tiene el formato correcto.");
+          alert("Error al importar datos");
         }
       } catch (err) {
-        alert("Error al leer el archivo. Asegúrate de que sea un JSON válido.");
+        alert("Archivo no válido");
       }
     };
     reader.readAsText(file);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -284,7 +312,7 @@ const ProfileView = ({
               </span>
             </div>
             <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={toggleTheme}
               className={`w-12 h-6 rounded-full transition-colors relative ${isDarkMode ? "bg-rose-500" : "bg-zinc-300 dark:bg-zinc-600"}`}
             >
               <div
@@ -482,36 +510,77 @@ const containerVariants = {
 };
 
 export default function App() {
-  const [profile, setProfile] = useState(() => {
-    const saved = localStorage.getItem("danceflow_profile");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          name: "Profesor",
-          email: "profesor@ejemplo.com",
-          avatarUrl: "",
-          password: "password123",
-        };
+  const [profile, setProfile] = useState<{
+    name: string;
+    email: string;
+    avatarUrl: string;
+    theme: 'light' | 'dark';
+  }>({
+    name: "Profesor",
+    email: "profesor@ejemplo.com",
+    avatarUrl: "",
+    theme: "dark",
   });
 
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  // Check auth on mount
   useEffect(() => {
-    try {
-      localStorage.setItem("danceflow_profile", JSON.stringify(profile));
-    } catch (e: any) {
-      console.error("Error saving profile:", e);
-      if (e.name === "QuotaExceededError") {
-        alert("Atención: El almacenamiento local está lleno. Es posible que los últimos cambios (como la imagen del perfil) no se guarden correctamente. Intenta limpiar datos en tu historial.");
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const { user } = await res.json();
+          if (user) {
+            setIsAuthenticated(true);
+            setProfile({
+              name: user.name,
+              email: user.email,
+              avatarUrl: user.avatar_url || "",
+              theme: user.theme || "dark",
+            });
+            setIsDarkMode(user.theme === "dark");
+          } else {
+            setIsAuthenticated(false);
+          }
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        setIsAuthenticated(false);
       }
-    }
-  }, [profile]);
+    };
+    checkAuth();
+  }, []);
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem("auth_danceflow") === "true";
-  });
+  // Listen for Google OAuth success
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
+        const checkRes = await fetch('/api/auth/me');
+        if (checkRes.ok) {
+          const { user } = await checkRes.json();
+          if (user) {
+            setIsAuthenticated(true);
+            setProfile({
+              name: user.name,
+              email: user.email,
+              avatarUrl: user.avatar_url || "",
+              theme: user.theme || "dark",
+            });
+            setIsDarkMode(user.theme === "dark");
+          }
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [dashboardMonth, setDashboardMonth] = useState(() => {
     const d = new Date();
@@ -537,11 +606,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "historial" | "perfil"
   >("dashboard");
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Attempt to load dark mode preference, default to dark if not set
-    const saved = localStorage.getItem("theme_danceflow");
-    return saved ? saved === "dark" : true;
-  });
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isCreatingActivity, setIsCreatingActivity] = useState(false);
 
   const [newActName, setNewActName] = useState("");
@@ -588,6 +653,7 @@ export default function App() {
   const [showAttendeesModal, setShowAttendeesModal] = useState<
     "create" | "edit" | null
   >(null);
+  const [showStudentModal, setShowStudentModal] = useState<"create" | "edit" | null>(null);
   const [newStudentName, setNewStudentName] = useState("");
   const [studentHistoryId, setStudentHistoryId] = useState<string | null>(null);
   const [studentHistoryPage, setStudentHistoryPage] = useState(1);
@@ -601,44 +667,87 @@ export default function App() {
     notes: string;
   }>({ name: "", phone: "", email: "", notes: "" });
 
-  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [filterDateStart, setFilterDateStart] = useState("");
-  const [filterDateEnd, setFilterDateEnd] = useState("");
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentCurrentPage, setStudentCurrentPage] = useState(1);
+  const STUDENTS_PER_PAGE = 8;
+
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [sessionCurrentPage, setSessionCurrentPage] = useState(1);
-  const SESSIONS_PER_PAGE = 6;
+  const SESSIONS_PER_PAGE = 10;
+  const [filterStatuses, setFilterStatuses] = useState<ClassStatus[]>([]);
+  const [filterDateStart, setFilterDateStart] = useState("");
+  const [filterDateEnd, setFilterDateEnd] = useState("");
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
-      localStorage.setItem("theme_danceflow", "dark");
     } else {
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme_danceflow", "light");
     }
   }, [isDarkMode]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      (username.toLowerCase() === "ana" && password === "salsanova") ||
-      (username.toLowerCase() === profile.name.toLowerCase() &&
-        password === profile.password)
-    ) {
-      setIsAuthenticated(true);
-      localStorage.setItem("auth_danceflow", "true");
-      setLoginError(false);
-      setUsername("");
-      setPassword("");
-    } else {
+    setIsLoggingIn(true);
+    setLoginError(false);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        const { user } = await res.json();
+        setIsAuthenticated(true);
+        setProfile({
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatar_url || "",
+          theme: user.theme || "dark",
+        });
+        setIsDarkMode(user.theme === "dark");
+        setUsername("");
+        setPassword("");
+      } else {
+        setLoginError(true);
+      }
+    } catch (err) {
       setLoginError(true);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem("auth_danceflow");
+  const handleGoogleLogin = async () => {
+    try {
+      const res = await fetch('/api/auth/google/url');
+      if (res.ok) {
+        const { url } = await res.json();
+        const width = 500;
+        const height = 600;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        
+        window.open(
+          url,
+          'google-login',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+      }
+    } catch (err) {
+      console.error("Google login error:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setIsAuthenticated(false);
+    } catch (err) {
+      console.error("Logout error:", err);
+      setIsAuthenticated(false);
+    }
   };
 
   const handleAddActivity = (e: React.FormEvent) => {
@@ -1074,6 +1183,17 @@ export default function App() {
     doc.save(`registro_sesiones_${formattedDate}.pdf`);
   };
 
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-rose-500/20 border-t-rose-500 rounded-full animate-spin" />
+          <p className="text-zinc-500 font-medium animate-pulse">Iniciando SalsaNova...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="relative min-h-[100dvh] overflow-x-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
@@ -1183,10 +1303,46 @@ export default function App() {
 
               <button
                 type="submit"
-                className="group w-full py-4 px-4 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2"
+                disabled={isLoggingIn}
+                className="group w-full py-4 px-4 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Entrar
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                {isLoggingIn ? "Entrando..." : "Entrar"}
+                {!isLoggingIn && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+              </button>
+
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-zinc-200 dark:border-zinc-800"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-zinc-900 px-2 text-zinc-500 font-bold">O continuar con</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full py-4 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 text-sm font-bold rounded-2xl hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-sm"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                Google
               </button>
             </form>
           </div>
@@ -2799,6 +2955,134 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      {/* Student Modal (Create/Edit) */}
+      <AnimatePresence>
+        {showStudentModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 10, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-zinc-200/50 dark:border-white/10"
+            >
+              <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                <h3 className="font-black text-xl text-zinc-900 dark:text-white">
+                  {showStudentModal === "create" ? "Nuevo Alumno" : "Editar Alumno"}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowStudentModal(null);
+                    setEditingStudentId(null);
+                  }}
+                  className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (editStudentData.name.trim()) {
+                    if (showStudentModal === "create") {
+                      addStudent({
+                        id: crypto.randomUUID(),
+                        name: editStudentData.name.trim(),
+                        phone: editStudentData.phone.trim(),
+                        email: editStudentData.email.trim(),
+                        notes: editStudentData.notes.trim(),
+                      });
+                    } else if (editingStudentId) {
+                      editStudent(editingStudentId, {
+                        name: editStudentData.name.trim(),
+                        phone: editStudentData.phone.trim(),
+                        email: editStudentData.email.trim(),
+                        notes: editStudentData.notes.trim(),
+                      });
+                    }
+                    setShowStudentModal(null);
+                    setEditingStudentId(null);
+                    setEditStudentData({ name: "", phone: "", email: "", notes: "" });
+                  }
+                }}
+                className="p-6 space-y-4"
+              >
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={editStudentData.name}
+                    onChange={(e) => setEditStudentData(d => ({ ...d, name: e.target.value }))}
+                    className="w-full h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Teléfono</label>
+                    <input
+                      type="tel"
+                      value={editStudentData.phone}
+                      onChange={(e) => setEditStudentData(d => ({ ...d, phone: e.target.value }))}
+                      className="w-full h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                      placeholder="600000000"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email</label>
+                    <input
+                      type="email"
+                      value={editStudentData.email}
+                      onChange={(e) => setEditStudentData(d => ({ ...d, email: e.target.value }))}
+                      className="w-full h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                      placeholder="alumno@email.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Notas / Observaciones</label>
+                  <textarea
+                    rows={3}
+                    value={editStudentData.notes}
+                    onChange={(e) => setEditStudentData(d => ({ ...d, notes: e.target.value }))}
+                    className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-3 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100 resize-none"
+                    placeholder="Detalles adicionales..."
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStudentModal(null);
+                      setEditingStudentId(null);
+                    }}
+                    className="flex-1 h-12 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-2 h-12 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white font-bold rounded-2xl shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                  >
+                    {showStudentModal === "create" ? "Añadir Alumno" : "Guardar Cambios"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Attendees Modal */}
       <AnimatePresence>
         {showAttendeesModal && (
@@ -2869,87 +3153,7 @@ export default function App() {
                           ? sessionAttendeeIds.includes(student.id)
                           : editSessionAttendeeIds.includes(student.id);
 
-                      return editingStudentId === student.id ? (
-                        <div
-                          key={`edit-${student.id}`}
-                          className="flex flex-col gap-2 p-3 rounded-2xl border border-rose-200 dark:border-rose-900/30 bg-rose-50/30 dark:bg-rose-900/10"
-                        >
-                          <input
-                            type="text"
-                            value={editStudentData.name}
-                            onChange={(e) =>
-                              setEditStudentData((d) => ({
-                                ...d,
-                                name: e.target.value,
-                              }))
-                            }
-                            placeholder="Nombre *"
-                            className="bg-white dark:bg-zinc-800 px-3 py-2 rounded-xl text-sm border border-zinc-200 dark:border-zinc-700 outline-none focus:border-rose-500"
-                          />
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={editStudentData.phone}
-                              onChange={(e) =>
-                                setEditStudentData((d) => ({
-                                  ...d,
-                                  phone: e.target.value,
-                                }))
-                              }
-                              placeholder="Teléfono"
-                              className="flex-1 min-w-0 bg-white dark:bg-zinc-800 px-3 py-2 rounded-xl text-sm border border-zinc-200 dark:border-zinc-700 outline-none focus:border-rose-500"
-                            />
-                            <input
-                              type="email"
-                              value={editStudentData.email}
-                              onChange={(e) =>
-                                setEditStudentData((d) => ({
-                                  ...d,
-                                  email: e.target.value,
-                                }))
-                              }
-                              placeholder="Email"
-                              className="flex-1 min-w-0 bg-white dark:bg-zinc-800 px-3 py-2 rounded-xl text-sm border border-zinc-200 dark:border-zinc-700 outline-none focus:border-rose-500"
-                            />
-                          </div>
-                          <input
-                            type="text"
-                            value={editStudentData.notes}
-                            onChange={(e) =>
-                              setEditStudentData((d) => ({
-                                ...d,
-                                notes: e.target.value,
-                              }))
-                            }
-                            placeholder="Notas opcionales"
-                            className="bg-white dark:bg-zinc-800 px-3 py-2 rounded-xl text-sm border border-zinc-200 dark:border-zinc-700 outline-none focus:border-rose-500"
-                          />
-                          <div className="flex justify-end gap-2 mt-1">
-                            <button
-                              onClick={() => setEditingStudentId(null)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (editStudentData.name.trim()) {
-                                  editStudent(student.id, {
-                                    name: editStudentData.name.trim(),
-                                    phone: editStudentData.phone.trim(),
-                                    email: editStudentData.email.trim(),
-                                    notes: editStudentData.notes.trim(),
-                                  });
-                                  setEditingStudentId(null);
-                                }
-                              }}
-                              className="px-3 py-1.5 bg-rose-500 text-white rounded-lg text-xs font-semibold hover:bg-rose-600 shadow-sm"
-                            >
-                              Guardar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
+                      return (
                         <div
                           key={student.id}
                           className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-800/20"
@@ -2988,42 +3192,6 @@ export default function App() {
                               </span>
                             )}
                           </div>
-                          <button
-                            onClick={() => setStudentHistoryId(student.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors shrink-0"
-                            title="Ver historial de asistencia"
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingStudentId(student.id);
-                              setEditStudentData({
-                                name: student.name,
-                                phone: student.phone || "",
-                                email: student.email || "",
-                                notes: student.notes || "",
-                              });
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors shrink-0"
-                            title="Editar alumno"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              deleteStudent(student.id);
-                              setSessionAttendeeIds((prev) =>
-                                prev.filter((id) => id !== student.id),
-                              );
-                              setEditSessionAttendeeIds((prev) =>
-                                prev.filter((id) => id !== student.id),
-                              );
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
                       );
                     })

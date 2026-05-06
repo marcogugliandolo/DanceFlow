@@ -18,20 +18,27 @@ export function useDanceStore(selectedMonth?: string) {
   });
 
   useEffect(() => {
-    localStorage.setItem('dance_activities', JSON.stringify(activities));
+    // localStorage.setItem('dance_activities', JSON.stringify(activities));
   }, [activities]);
 
   useEffect(() => {
-    localStorage.setItem('dance_sessions', JSON.stringify(sessions));
+    // localStorage.setItem('dance_sessions', JSON.stringify(sessions));
   }, [sessions]);
 
   useEffect(() => {
-    localStorage.setItem('dance_students', JSON.stringify(students));
+    // localStorage.setItem('dance_students', JSON.stringify(students));
   }, [students]);
+
+  const lastLocalUpdate = useRef<number>(0);
 
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
     const fetchData = async () => {
+      // Don't poll if we just updated locally in the last 3 seconds
+      if (Date.now() - lastLocalUpdate.current < 3000) {
+        return;
+      }
+
       try {
         const [actRes, sesRes, stuRes] = await Promise.all([
           fetch('/api/activities', { cache: 'no-store' }),
@@ -44,13 +51,7 @@ export function useDanceStore(selectedMonth?: string) {
           const stus = await stuRes.json();
 
           setActivities(acts);
-          setSessions(prev => {
-            const serverIds = new Set(sessRaw.map((s: any) => s.id));
-            const pendingLocal = prev.filter(s => !serverIds.has(s.id));
-            // Combine pending local (new records) with server records
-            // Note: Does not handle local deletes perfectly, but avoids ADD glitch
-            return [...sessRaw, ...pendingLocal];
-          });
+          setSessions(sessRaw);
           setStudents(stus);
         }
       } catch (err) {
@@ -67,26 +68,32 @@ export function useDanceStore(selectedMonth?: string) {
   }, []);
 
   const syncActivity = async (a: Activity) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) }); } catch(e) {}
   };
 
   const syncSession = async (s: ClassSession) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); } catch(e) {}
   };
 
   const syncStudent = async (student: Student) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) }); } catch(e) {}
   };
 
   const deleteActivityFromServer = async (id: string) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/activities/${id}`, { method: 'DELETE' }); } catch(e) {}
   };
 
   const deleteSessionFromServer = async (id: string) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/sessions/${id}`, { method: 'DELETE' }); } catch(e) {}
   };
 
   const deleteStudentFromServer = async (id: string) => {
+    lastLocalUpdate.current = Date.now();
     try { await fetch(`/api/students/${id}`, { method: 'DELETE' }); } catch(e) {}
   };
 
