@@ -732,16 +732,9 @@ export default function App() {
       const res = await fetch('/api/auth/google/url');
       if (res.ok) {
         const { url } = await res.json();
-        const width = 500;
-        const height = 600;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        
-        window.open(
-          url,
-          'google-login',
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
+        // Redirect completely to the Google login URL instead of opening a popup
+        // This is necessary for mobile devices and iframes
+        window.location.href = url;
       }
     } catch (err) {
       console.error("Google login error:", err);
@@ -1213,7 +1206,7 @@ export default function App() {
 
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className="absolute top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+          className="absolute top-6 right-6 w-10 h-10 z-[100] rounded-full flex items-center justify-center bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
         >
           {isDarkMode ? (
             <Sun className="w-5 h-5" />
