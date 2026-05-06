@@ -363,9 +363,9 @@ app.get("/api/admin/users", requireAuth, (req, res) => {
 app.get("/api/export", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   try {
-    const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(user.id);
-    const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
-    const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(user.id);
+    const activities = db.prepare("SELECT * FROM activities").all();
+    const sessions = db.prepare("SELECT * FROM class_sessions").all();
+    const students = db.prepare("SELECT * FROM students").all();
     
     res.json({
       activities,
@@ -431,8 +431,7 @@ app.use("/api", (req, res, next) => {
 
 // Get all activities
 app.get("/api/activities", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(user.id);
+  const activities = db.prepare("SELECT * FROM activities").all();
   res.json(activities.map((a: any) => ({...a, isRecurring: Boolean(a.isRecurring)})));
 });
 
@@ -470,10 +469,9 @@ app.post("/api/activities/:id", requireAuth, (req, res) => {
 });
 
 app.delete("/api/activities/:id", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
   try {
-    const r1 = db.prepare("DELETE FROM class_sessions WHERE activityId = ? AND user_id = ?").run(req.params.id, user.id);
-    const r2 = db.prepare("DELETE FROM activities WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const r1 = db.prepare("DELETE FROM class_sessions WHERE activityId = ?").run(req.params.id);
+    const r2 = db.prepare("DELETE FROM activities WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   } catch (err) {
     console.error("DELETE activities error:", err);
@@ -483,8 +481,7 @@ app.delete("/api/activities/:id", requireAuth, (req, res) => {
 
 // Get all sessions
 app.get("/api/sessions", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
+  const sessions = db.prepare("SELECT * FROM class_sessions").all();
   // Ensure attendeeIds is returned as an array or empty array if null
   res.json(sessions.map((s: any) => ({
     ...s,
@@ -520,9 +517,8 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
 });
 
 app.delete("/api/sessions/:id", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
   try {
-    const result = db.prepare("DELETE FROM class_sessions WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const result = db.prepare("DELETE FROM class_sessions WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE session error:", err);
@@ -556,7 +552,7 @@ app.post("/api/external/clase", express.json(), (req, res) => {
     }
 
     // Buscar actividad por nombre (coincidencia parcial)
-    const activity = db.prepare("SELECT * FROM activities WHERE name LIKE ? AND user_id = ? LIMIT 1").get(`%${className}%`, user.id) as any;
+    const activity = db.prepare("SELECT * FROM activities WHERE name LIKE ? LIMIT 1").get(`%${className}%`) as any;
 
     if (!activity) {
       return res.status(404).json({ error: `No pude encontrar una clase (actividad) que coincida con "${className}".` });
@@ -594,8 +590,7 @@ app.post("/api/external/clase", express.json(), (req, res) => {
 
 // Get all students
 app.get("/api/students", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(user.id);
+  const students = db.prepare("SELECT * FROM students").all();
   res.json(students);
 });
 
@@ -614,9 +609,8 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
 });
 
 app.delete("/api/students/:id", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
   try {
-    db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    db.prepare("DELETE FROM students WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE student error:", err);

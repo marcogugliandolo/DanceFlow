@@ -69,17 +69,32 @@ export function useDanceStore(selectedMonth?: string) {
 
   const syncActivity = async (a: Activity) => {
     lastLocalUpdate.current = Date.now();
-    try { await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) }); } catch(e) {}
+    try { 
+      const res = await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) });
+      if (!res.ok) console.error("Failed to sync activity:", await res.text());
+    } catch(e) {
+      console.error("Fetch error on syncActivity:", e);
+    }
   };
 
   const syncSession = async (s: ClassSession) => {
     lastLocalUpdate.current = Date.now();
-    try { await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); } catch(e) {}
+    try { 
+      const res = await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); 
+      if (!res.ok) console.error("Failed to sync session:", await res.text());
+    } catch(e) {
+      console.error("Fetch error on syncSession:", e);
+    }
   };
 
   const syncStudent = async (student: Student) => {
     lastLocalUpdate.current = Date.now();
-    try { await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) }); } catch(e) {}
+    try { 
+      const res = await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) });
+      if (!res.ok) console.error("Failed to sync student:", await res.text());
+    } catch(e) {
+      console.error("Fetch error on syncStudent:", e);
+    }
   };
 
   const deleteActivityFromServer = async (id: string) => {
