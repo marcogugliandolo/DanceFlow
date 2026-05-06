@@ -206,6 +206,9 @@ export function useDanceStore(selectedMonth?: string) {
       ? sessions.filter(s => s.date.startsWith(selectedMonth))
       : sessions;
 
+    const globalStudents = new Set<string>();
+    const activityStudents: Record<string, Set<string>> = {};
+
     // Initialize activities
     activities.forEach((act) => {
       stats.activities[act.id] = {
@@ -217,6 +220,7 @@ export function useDanceStore(selectedMonth?: string) {
         totalDuration: 0,
         justifications: [],
       };
+      activityStudents[act.id] = new Set();
 
       // Add monthly fee if they have any sessions in this month, or if it's recurring
       if (act.paymentType === 'monthly') {
@@ -234,9 +238,14 @@ export function useDanceStore(selectedMonth?: string) {
 
       const actStats = stats.activities[session.activityId];
 
+      if (session.attendeeIds && Array.isArray(session.attendeeIds)) {
+        session.attendeeIds.forEach(id => {
+          globalStudents.add(id);
+          activityStudents[session.activityId].add(id);
+        });
+      }
+
       if (session.status === 'held') {
-        const attendees = session.attendeeIds?.length || 0;
-        
         // Calculate revenue based on payment type
         let sessionRevenue = 0;
         if (activity.paymentType !== 'monthly') {
@@ -246,11 +255,9 @@ export function useDanceStore(selectedMonth?: string) {
         stats.totalHeld++;
         stats.totalBilled++;
         stats.totalRevenue += sessionRevenue;
-        stats.totalAttendees += attendees;
         
         actStats.heldCount++;
         actStats.totalRevenue += sessionRevenue;
-        actStats.totalAttendees += attendees;
         if (session.duration) {
           actStats.totalDuration += session.duration;
         }
@@ -275,6 +282,13 @@ export function useDanceStore(selectedMonth?: string) {
         if (session.justification && session.justification.trim() !== '') {
           actStats.justifications.push(session.justification);
         }
+      }
+    });
+
+    stats.totalAttendees = globalStudents.size;
+    Object.keys(activityStudents).forEach(actId => {
+      if (stats.activities[actId]) {
+        stats.activities[actId].totalAttendees = activityStudents[actId].size;
       }
     });
 
