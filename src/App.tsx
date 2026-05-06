@@ -745,10 +745,18 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('dance_activities');
+      localStorage.removeItem('dance_sessions');
+      localStorage.removeItem('dance_students');
       setIsAuthenticated(false);
+      window.location.reload();
     } catch (err) {
       console.error("Logout error:", err);
+      localStorage.removeItem('dance_activities');
+      localStorage.removeItem('dance_sessions');
+      localStorage.removeItem('dance_students');
       setIsAuthenticated(false);
+      window.location.reload();
     }
   };
 

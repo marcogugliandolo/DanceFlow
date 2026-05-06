@@ -301,6 +301,9 @@ app.post("/api/import", requireAuth, (req, res) => {
   const studentsToImport = students || dance_students;
 
   try {
+    const activityIdMap = new Map<string, string>();
+    const studentIdMap = new Map<string, string>();
+
     db.transaction(() => {
       // Clear existing data for this user
       db.prepare("DELETE FROM activities WHERE user_id = ?").run(user.id);
@@ -311,15 +314,9 @@ app.post("/api/import", requireAuth, (req, res) => {
       if (activitiesToImport && Array.isArray(activitiesToImport)) {
         const insAct = db.prepare("INSERT INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         for (const a of activitiesToImport) {
-          insAct.run(a.id, user.id, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
-        }
-      }
-
-      // Import sessions
-      if (sessionsToImport && Array.isArray(sessionsToImport)) {
-        const insSes = db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        for (const s of sessionsToImport) {
-          insSes.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+          const newId = crypto.randomUUID();
+          activityIdMap.set(a.id, newId);
+          insAct.run(newId, user.id, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
         }
       }
 
@@ -327,7 +324,32 @@ app.post("/api/import", requireAuth, (req, res) => {
       if (studentsToImport && Array.isArray(studentsToImport)) {
         const insStu = db.prepare("INSERT INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)");
         for (const s of studentsToImport) {
-          insStu.run(s.id, user.id, s.name || 'Estudiante sin nombre', s.phone || null, s.email || null, s.notes || null);
+          const newId = crypto.randomUUID();
+          studentIdMap.set(s.id, newId);
+          insStu.run(newId, user.id, s.name || 'Estudiante sin nombre', s.phone || null, s.email || null, s.notes || null);
+        }
+      }
+
+      // Import sessions (dependent on activities and students)
+      if (sessionsToImport && Array.isArray(sessionsToImport)) {
+        const insSes = db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        for (const s of sessionsToImport) {
+          const newId = crypto.randomUUID();
+          const newActivityId = activityIdMap.get(s.activityId) || s.activityId; // fallback should not happen normally
+          
+          let newAttendeeIds: string[] = [];
+          if (Array.isArray(s.attendeeIds)) {
+            newAttendeeIds = s.attendeeIds.map(oldId => studentIdMap.get(oldId as string) || (oldId as string));
+          } else if (typeof s.attendeeIds === 'string') {
+            try {
+              const parsed = JSON.parse(s.attendeeIds);
+              if (Array.isArray(parsed)) {
+                newAttendeeIds = parsed.map(oldId => studentIdMap.get(oldId as string) || (oldId as string));
+              }
+            } catch (e) {}
+          }
+
+          insSes.run(newId, user.id, newActivityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(newAttendeeIds), s.duration ?? 1);
         }
       }
     })();
@@ -361,7 +383,7 @@ app.post("/api/activities", requireAuth, (req, res) => {
   
   db.transaction(() => {
     for (const a of activities) {
-      insert.run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+      insert.run(a.id, user.id, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
     }
   })();
   res.json({ success: true });
@@ -372,7 +394,7 @@ app.post("/api/activities/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const a = req.body;
   db.prepare("INSERT OR REPLACE INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(a.id, user.id, a.name, a.location, a.pricePerClass, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+    .run(a.id, user.id, a.name || 'Actividad', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
   res.json({ success: true });
 });
 
@@ -407,7 +429,7 @@ app.post("/api/sessions", requireAuth, (req, res) => {
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, user.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+      insert.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
     }
   })();
   res.json({ success: true });
@@ -418,7 +440,7 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
   const s = req.body;
   try {
     db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(s.id, user.id, s.activityId, s.date, s.status, s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+      .run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
     res.json({ success: true });
   } catch (err: any) {
     console.error("POST session error:", err);
@@ -506,13 +528,32 @@ app.get("/api/students", requireAuth, (req, res) => {
   res.json(students);
 });
 
+// Save all students (bulk)
+app.post("/api/students", requireAuth, (req, res) => {
+  const user = ((req as any).session as any).user;
+  const students = req.body;
+  const insert = db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)");
+  
+  try {
+    db.transaction(() => {
+      for (const s of students) {
+        insert.run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null);
+      }
+    })();
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST students bulk error:", err);
+    res.status(500).json({ error: "DB Error", details: err.message });
+  }
+});
+
 // Update or add single student
 app.post("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const s = req.body;
   try {
     db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(s.id, user.id, s.name, s.phone || null, s.email || null, s.notes || null);
+      .run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null);
     res.json({ success: true, student: s });
   } catch (err: any) {
     console.error("POST student error:", err);
