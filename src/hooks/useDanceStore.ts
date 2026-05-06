@@ -273,9 +273,15 @@ export function useDanceStore(selectedMonth?: string) {
     return stats;
   }, [activities, sessions, selectedMonth]);
 
+  const filteredSessions = useMemo(() => {
+    return selectedMonth
+      ? sessions.filter(s => s.date.startsWith(selectedMonth))
+      : sessions;
+  }, [sessions, selectedMonth]);
+
   return {
     activities,
-    sessions,
+    sessions: filteredSessions,
     students,
     summary,
     addActivity,
