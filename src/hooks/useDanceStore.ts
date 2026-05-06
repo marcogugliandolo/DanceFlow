@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Activity, ClassSession, SummaryStats, ActivityStats, Student } from '../types';
 
 export function useDanceStore(selectedMonth?: string) {
@@ -31,34 +31,34 @@ export function useDanceStore(selectedMonth?: string) {
 
   const lastLocalUpdate = useRef<number>(0);
 
-  const fetchData = useCallback(async () => {
-    // Don't poll if we just updated locally in the last 3 seconds
-    if (Date.now() - lastLocalUpdate.current < 3000) {
-      return;
-    }
-
-    try {
-      const [actRes, sesRes, stuRes] = await Promise.all([
-        fetch('/api/activities', { cache: 'no-store' }),
-        fetch('/api/sessions', { cache: 'no-store' }),
-        fetch('/api/students', { cache: 'no-store' })
-      ]);
-      if (actRes.ok && sesRes.ok && stuRes.ok) {
-        const acts = await actRes.json();
-        const sessRaw = await sesRes.json();
-        const stus = await stuRes.json();
-
-        setActivities(acts);
-        setSessions(sessRaw);
-        setStudents(stus);
-      }
-    } catch (err) {
-      console.error("Failed to fetch from server", err);
-    }
-  }, []);
-
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
+    const fetchData = async () => {
+      // Don't poll if we just updated locally in the last 3 seconds
+      if (Date.now() - lastLocalUpdate.current < 3000) {
+        return;
+      }
+
+      try {
+        const [actRes, sesRes, stuRes] = await Promise.all([
+          fetch('/api/activities', { cache: 'no-store' }),
+          fetch('/api/sessions', { cache: 'no-store' }),
+          fetch('/api/students', { cache: 'no-store' })
+        ]);
+        if (actRes.ok && sesRes.ok && stuRes.ok) {
+          const acts = await actRes.json();
+          const sessRaw = await sesRes.json();
+          const stus = await stuRes.json();
+
+          setActivities(acts);
+          setSessions(sessRaw);
+          setStudents(stus);
+        }
+      } catch (err) {
+        console.error("Failed to fetch from server", err);
+      }
+    };
+    
     // Initial fetch
     fetchData();
     
@@ -69,32 +69,17 @@ export function useDanceStore(selectedMonth?: string) {
 
   const syncActivity = async (a: Activity) => {
     lastLocalUpdate.current = Date.now();
-    try { 
-      const res = await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) });
-      if (!res.ok) console.error("Failed to sync activity:", await res.text());
-    } catch(e) {
-      console.error("Fetch error on syncActivity:", e);
-    }
+    try { await fetch(`/api/activities/${a.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(a) }); } catch(e) {}
   };
 
   const syncSession = async (s: ClassSession) => {
     lastLocalUpdate.current = Date.now();
-    try { 
-      const res = await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); 
-      if (!res.ok) console.error("Failed to sync session:", await res.text());
-    } catch(e) {
-      console.error("Fetch error on syncSession:", e);
-    }
+    try { await fetch(`/api/sessions/${s.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s) }); } catch(e) {}
   };
 
   const syncStudent = async (student: Student) => {
     lastLocalUpdate.current = Date.now();
-    try { 
-      const res = await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) });
-      if (!res.ok) console.error("Failed to sync student:", await res.text());
-    } catch(e) {
-      console.error("Fetch error on syncStudent:", e);
-    }
+    try { await fetch(`/api/students/${student.id}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(student) }); } catch(e) {}
   };
 
   const deleteActivityFromServer = async (id: string) => {
@@ -232,7 +217,7 @@ export function useDanceStore(selectedMonth?: string) {
         // Calculate revenue based on payment type
         let sessionRevenue = 0;
         if (activity.paymentType !== 'monthly') {
-          sessionRevenue = activity.pricePerClass * (session.duration ?? 1);
+          sessionRevenue = activity.pricePerClass;
         }
         
         stats.totalHeld++;
@@ -252,7 +237,7 @@ export function useDanceStore(selectedMonth?: string) {
         if (session.status === 'cancelled_billed') {
           let cancelRevenue = 0;
           if (activity.paymentType !== 'monthly') {
-             cancelRevenue = activity.pricePerClass * (session.duration ?? 1);
+             cancelRevenue = activity.pricePerClass;
           }
 
           stats.totalBilled++;
@@ -273,15 +258,9 @@ export function useDanceStore(selectedMonth?: string) {
     return stats;
   }, [activities, sessions, selectedMonth]);
 
-  const filteredSessions = useMemo(() => {
-    return selectedMonth
-      ? sessions.filter(s => s.date.startsWith(selectedMonth))
-      : sessions;
-  }, [sessions, selectedMonth]);
-
   return {
     activities,
-    sessions: filteredSessions,
+    sessions,
     students,
     summary,
     addActivity,
@@ -293,6 +272,5 @@ export function useDanceStore(selectedMonth?: string) {
     addStudent,
     editStudent,
     deleteStudent,
-    fetchData,
   };
 }

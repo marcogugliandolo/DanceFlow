@@ -6,7 +6,6 @@ import { useDanceStore } from "./hooks/useDanceStore";
 import { ClassStatus } from "./types";
 import { motion, AnimatePresence } from "motion/react";
 import Holidays from "date-holidays";
-import AdminPanel from "./AdminPanel";
 
 const hd = new Holidays("ES");
 
@@ -523,13 +522,11 @@ export default function App() {
     email: string;
     avatarUrl: string;
     theme: 'light' | 'dark';
-    role: string;
   }>({
     name: "Profesor",
     email: "profesor@ejemplo.com",
     avatarUrl: "",
     theme: "dark",
-    role: "teacher"
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -548,7 +545,6 @@ export default function App() {
               email: user.email,
               avatarUrl: user.avatar_url || "",
               theme: user.theme || "dark",
-              role: user.role || "teacher",
             });
             setIsDarkMode(user.theme === "dark");
           } else {
@@ -578,7 +574,6 @@ export default function App() {
               email: user.email,
               avatarUrl: user.avatar_url || "",
               theme: user.theme || "dark",
-              role: user.role || "teacher",
             });
             setIsDarkMode(user.theme === "dark");
           }
@@ -613,11 +608,10 @@ export default function App() {
     addStudent,
     editStudent,
     deleteStudent,
-    fetchData,
   } = useDanceStore(dashboardMonth);
 
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "historial" | "alumnos" | "perfil" | "admin"
+    "dashboard" | "historial" | "alumnos" | "perfil"
   >("dashboard");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -938,7 +932,7 @@ export default function App() {
       if (!activity) return;
       if (activity.paymentType !== "monthly") {
         if (s.status === "held" || s.status === "cancelled_billed") {
-          totalRevenue += activity.pricePerClass * (s.duration ?? 1);
+          totalRevenue += activity.pricePerClass;
         }
       }
     });
@@ -964,9 +958,9 @@ export default function App() {
 
       let amount = 0;
       if (activity.paymentType !== "monthly") {
-        if (s.status === "held") amount = activity.pricePerClass * (s.duration ?? 1);
+        if (s.status === "held") amount = activity.pricePerClass;
         else if (s.status === "cancelled_billed")
-          amount = activity.pricePerClass * (s.duration ?? 1);
+          amount = activity.pricePerClass;
       }
 
       if (!groupedMap.has(activity.id)) {
@@ -1221,12 +1215,6 @@ export default function App() {
     doc.save(`registro_sesiones_${formattedDate}.pdf`);
   };
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchData();
-    }
-  }, [isAuthenticated, fetchData]);
-
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center">
@@ -1469,7 +1457,7 @@ export default function App() {
 
           {/* Menú de pestañas - Desktop */}
           <div className="hidden lg:flex w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
-            {(["dashboard", "historial", "alumnos", "perfil"] as const).concat(profile.role === 'admin' ? ["admin"] as any : []).map((tab: any) => (
+            {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1497,8 +1485,6 @@ export default function App() {
                     <History className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : tab === "alumnos" ? (
                     <User className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
-                  ) : tab === "admin" ? (
-                    <LayoutDashboard className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : profile.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -1547,7 +1533,7 @@ export default function App() {
               className="lg:hidden mt-2 mx-auto max-w-6xl"
             >
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-700/50 rounded-3xl p-2 shadow-xl flex flex-col gap-1 mx-2">
-                {(["dashboard", "historial", "alumnos", "perfil"] as const).concat(profile.role === 'admin' ? ["admin"] as any : []).map((tab: any) => (
+                {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => {
@@ -1566,8 +1552,6 @@ export default function App() {
                       <History className="w-5 h-5 opacity-70" />
                     ) : tab === "alumnos" ? (
                       <User className="w-5 h-5 opacity-70" />
-                    ) : tab === "admin" ? (
-                      <LayoutDashboard className="w-5 h-5 opacity-70" />
                     ) : profile.avatarUrl ? (
                       <img
                         src={profile.avatarUrl}
@@ -2995,7 +2979,7 @@ export default function App() {
                                       </div>
                                     ) : (
                                       <div className="text-base sm:text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-fuchsia-600 mt-2 sm:mt-0">
-                                        +{(activity.pricePerClass * (session.duration ?? 1)).toFixed(2)}€
+                                        +{activity.pricePerClass.toFixed(2)}€
                                       </div>
                                     )
                                   ) : (
@@ -3255,16 +3239,6 @@ export default function App() {
                 profile={profile}
                 setProfile={setProfile}
               />
-            </motion.div>
-          ) : activeTab === "admin" ? (
-            <motion.div
-              key="admin"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.2 }}
-            >
-               <AdminPanel />
             </motion.div>
           ) : null}
         </AnimatePresence>
