@@ -434,8 +434,7 @@ app.use("/api", (req, res, next) => {
 
 // Get all activities
 app.get("/api/activities", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(user.id);
+  const activities = db.prepare("SELECT * FROM activities").all();
   res.json(activities.map((a: any) => ({...a, isRecurring: Boolean(a.isRecurring)})));
 });
 
@@ -485,8 +484,7 @@ app.delete("/api/activities/:id", requireAuth, (req, res) => {
 
 // Get all sessions
 app.get("/api/sessions", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
+  const sessions = db.prepare("SELECT * FROM class_sessions").all();
   // Ensure attendeeIds is returned as an array or empty array if null
   res.json(sessions.map((s: any) => ({
     ...s,
@@ -595,8 +593,7 @@ app.post("/api/external/clase", express.json(), (req, res) => {
 
 // Get all students
 app.get("/api/students", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(user.id);
+  const students = db.prepare("SELECT * FROM students").all();
   res.json(students);
 });
 
