@@ -77,6 +77,9 @@ tryAlterTable("ALTER TABLE students ADD COLUMN phone TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN email TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN notes TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN duration REAL DEFAULT 1;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN notes TEXT;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN attendeeIds TEXT;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN justification TEXT;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN user_id TEXT;");
@@ -431,7 +434,8 @@ app.use("/api", (req, res, next) => {
 
 // Get all activities
 app.get("/api/activities", requireAuth, (req, res) => {
-  const activities = db.prepare("SELECT * FROM activities").all();
+  const user = ((req as any).session as any).user;
+  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(user.id);
   res.json(activities.map((a: any) => ({...a, isRecurring: Boolean(a.isRecurring)})));
 });
 
@@ -481,7 +485,8 @@ app.delete("/api/activities/:id", requireAuth, (req, res) => {
 
 // Get all sessions
 app.get("/api/sessions", requireAuth, (req, res) => {
-  const sessions = db.prepare("SELECT * FROM class_sessions").all();
+  const user = ((req as any).session as any).user;
+  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
   // Ensure attendeeIds is returned as an array or empty array if null
   res.json(sessions.map((s: any) => ({
     ...s,
@@ -590,7 +595,8 @@ app.post("/api/external/clase", express.json(), (req, res) => {
 
 // Get all students
 app.get("/api/students", requireAuth, (req, res) => {
-  const students = db.prepare("SELECT * FROM students").all();
+  const user = ((req as any).session as any).user;
+  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(user.id);
   res.json(students);
 });
 
