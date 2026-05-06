@@ -221,10 +221,15 @@ const ProfileView = ({
           <div className="flex-1 flex flex-col gap-1 w-full text-center sm:text-left mt-2">
             {!isEditing ? (
               <>
-                <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white break-words">
-                  {profile.name}
-                </h3>
-                <p className="text-sm font-medium text-zinc-500 break-all">
+                <div className="flex items-center gap-3 justify-center sm:justify-start">
+                  <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white break-words">
+                    {profile.name}
+                  </h3>
+                  <span className="px-2.5 py-1 bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest rounded-lg">
+                    Rol: Profesor
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-zinc-500 break-all mt-1">
                   {profile.email}
                 </p>
                 <div className="mt-5 flex justify-center sm:justify-start">
@@ -490,6 +495,8 @@ import {
   FileDown,
   Clock,
   CircleUserRound,
+  Grid,
+  Check,
 } from "lucide-react";
 
 const cardVariants = {
@@ -604,9 +611,10 @@ export default function App() {
   } = useDanceStore(dashboardMonth);
 
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "historial" | "perfil"
+    "dashboard" | "historial" | "alumnos" | "perfil"
   >("dashboard");
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreatingActivity, setIsCreatingActivity] = useState(false);
 
   const [newActName, setNewActName] = useState("");
@@ -1360,11 +1368,11 @@ export default function App() {
       </div>
 
       {/* Header Flotante */}
-      <header className="absolute top-3 inset-x-0 mx-auto z-50 w-[96%] max-w-6xl">
-        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl sm:rounded-full p-2 flex flex-col sm:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 gap-3 sm:gap-0">
+      <header className="absolute top-3 inset-x-0 mx-auto z-[100] w-[96%] max-w-6xl">
+        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/60 dark:border-white/10 rounded-3xl lg:rounded-full p-2 flex flex-col lg:flex-row items-center justify-between shadow-lg shadow-zinc-200/50 dark:shadow-black/50 gap-3 lg:gap-0">
           {/* Fila superior en móvil: Logo + Acciones */}
-          <div className="flex items-center justify-between w-full sm:w-auto px-2 sm:px-0">
-            <div className="flex items-center gap-2 sm:gap-3 sm:pl-2">
+          <div className="flex items-center justify-between w-full lg:w-auto px-2 lg:px-0">
+            <div className="flex items-center gap-2 lg:gap-3 lg:pl-2">
               <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 shadow-md overflow-hidden border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
                 <img
                   src={logoBase64}
@@ -1392,7 +1400,17 @@ export default function App() {
             </div>
 
             {/* Acciones en Móvil */}
-            <div className="flex sm:hidden items-center gap-1.5">
+            <div className="flex lg:hidden items-center gap-1.5">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-4 h-4" />
+                ) : (
+                  <Grid className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -1413,13 +1431,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Menú de pestañas */}
-          <div className="flex w-full sm:w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-2xl sm:rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
-            {(["dashboard", "historial", "perfil"] as const).map((tab) => (
+          {/* Menú de pestañas - Desktop */}
+          <div className="hidden lg:flex w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
+            {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`group relative flex-1 sm:flex-none px-2 sm:px-6 py-2 text-xs sm:text-[13px] font-bold sm:font-semibold rounded-xl sm:rounded-full outline-none transition-all ${
+                className={`group relative flex-none px-6 py-2 text-[13px] font-semibold rounded-full outline-none transition-all ${
                   activeTab === tab
                     ? "text-zinc-900 dark:text-white"
                     : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -1428,7 +1446,7 @@ export default function App() {
                 {activeTab === tab && (
                   <motion.div
                     layoutId="pill"
-                    className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-xl sm:rounded-full shadow-sm"
+                    className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-full shadow-sm"
                     transition={{
                       type: "tween",
                       duration: 0.15,
@@ -1436,11 +1454,13 @@ export default function App() {
                     }}
                   />
                 )}
-                <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 capitalize">
+                <span className="relative z-10 flex items-center justify-center gap-2 capitalize">
                   {tab === "dashboard" ? (
                     <LayoutDashboard className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : tab === "historial" ? (
                     <History className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
+                  ) : tab === "alumnos" ? (
+                    <User className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : profile.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -1457,7 +1477,7 @@ export default function App() {
           </div>
 
           {/* Acciones en Desktop */}
-          <div className="hidden sm:flex items-center pr-1 gap-1">
+          <div className="hidden lg:flex items-center pr-1 gap-1">
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -1477,10 +1497,60 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Menu Dropdown */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="lg:hidden mt-2 mx-auto max-w-6xl"
+            >
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-700/50 rounded-3xl p-2 shadow-xl flex flex-col gap-1 mx-2">
+                {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setActiveTab(tab);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                      activeTab === tab
+                        ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold"
+                        : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    {tab === "dashboard" ? (
+                      <LayoutDashboard className="w-5 h-5 opacity-70" />
+                    ) : tab === "historial" ? (
+                      <History className="w-5 h-5 opacity-70" />
+                    ) : tab === "alumnos" ? (
+                      <User className="w-5 h-5 opacity-70" />
+                    ) : profile.avatarUrl ? (
+                      <img
+                        src={profile.avatarUrl}
+                        alt="Avatar"
+                        className="w-6 h-6 rounded-full object-cover shadow-sm border border-zinc-200 dark:border-zinc-700"
+                      />
+                    ) : (
+                      <CircleUserRound className="w-5 h-5 opacity-70" />
+                    )}
+                    <span className="capitalize text-sm">{tab}</span>
+                    {activeTab === tab && (
+                      <Check className="w-4 h-4 ml-auto text-rose-500" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Main Content */}
-      <main className="pt-40 sm:pt-28 pb-12 px-4 max-w-6xl mx-auto">
+      <main className="pt-32 lg:pt-28 pb-12 px-4 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
           {activeTab === "dashboard" ? (
             <motion.div
@@ -2055,6 +2125,17 @@ export default function App() {
                         onChange={(e) => {
                           const actId = e.target.value;
                           setSessionActId(actId);
+                          if (actId) {
+                            const previousSessions = sessions.filter(s => s.activityId === actId);
+                            if (previousSessions.length > 0) {
+                              const latestSession = previousSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                              setSessionAttendeeIds(latestSession.attendeeIds || []);
+                            } else {
+                              setSessionAttendeeIds([]);
+                            }
+                          } else {
+                            setSessionAttendeeIds([]);
+                          }
                         }}
                         className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm overflow-hidden text-ellipsis"
                       >
@@ -2932,6 +3013,190 @@ export default function App() {
                         </div>
                       )}
                     </motion.div>
+                  );
+                })()}
+              </div>
+            </motion.div>
+          ) : activeTab === "alumnos" ? (
+            <motion.div
+              key="alumnos"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.15 }}
+              className="space-y-6"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+                    Gestión de Alumnos
+                  </h2>
+                  <p className="text-sm text-zinc-500 font-medium">
+                    Administra el listado completo de tus estudiantes
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingStudentId(null);
+                      setEditStudentData({ name: "", phone: "", email: "", notes: "" });
+                      setShowStudentModal("create");
+                    }}
+                    className="h-11 px-6 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl flex items-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Nuevo Alumno</span>
+                    <span className="sm:hidden">Nuevo</span>
+                  </button>
+                  <div className="relative flex-1 sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Buscar alumno..."
+                      value={studentSearchQuery}
+                      onChange={(e) => {
+                        setStudentSearchQuery(e.target.value);
+                        setStudentCurrentPage(1);
+                      }}
+                      className="w-full h-11 pl-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-white/5 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-700 dark:text-zinc-300 shadow-sm"
+                    />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(() => {
+                  let filtered = students;
+                  if (studentSearchQuery.trim()) {
+                    const q = studentSearchQuery.toLowerCase().trim();
+                    filtered = filtered.filter(s => 
+                      s.name.toLowerCase().includes(q) || 
+                      (s.email || "").toLowerCase().includes(q) ||
+                      (s.phone || "").includes(q)
+                    );
+                  }
+
+                  const totalPages = Math.ceil(filtered.length / STUDENTS_PER_PAGE);
+                  const startIndex = (studentCurrentPage - 1) * STUDENTS_PER_PAGE;
+                  const paginated = filtered.slice(startIndex, startIndex + STUDENTS_PER_PAGE);
+
+                  if (students.length === 0) {
+                    return (
+                      <div className="col-span-full py-16 text-center bg-white/40 dark:bg-zinc-900/40 rounded-[2.5rem] border border-dashed border-zinc-300 dark:border-zinc-700">
+                        <User className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                        <p className="text-zinc-500 font-medium">No has registrado ningún alumno.</p>
+                      </div>
+                    );
+                  }
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="col-span-full py-16 text-center">
+                        <p className="text-zinc-500 font-medium">No hay alumnos que coincidan con tu búsqueda.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {paginated.map((student) => (
+                        <motion.div
+                          key={student.id}
+                          variants={cardVariants}
+                          className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-[2rem] p-5 flex flex-col gap-4 shadow-sm hover:border-rose-500/30 transition-all relative group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-50 to-fuchsia-50 dark:from-rose-500/10 dark:to-fuchsia-500/10 flex items-center justify-center text-rose-500">
+                              <User className="w-6 h-6" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-zinc-900 dark:text-white truncate">
+                                {student.name}
+                              </h3>
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                {student.phone && (
+                                  <span className="text-[11px] font-medium text-zinc-500 flex items-center gap-1">
+                                    {student.phone}
+                                  </span>
+                                )}
+                                {student.email && (
+                                  <span className="text-[11px] font-medium text-zinc-500 flex items-center gap-1">
+                                    {student.email}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {student.notes && (
+                            <div className="bg-zinc-100/50 dark:bg-zinc-800/50 p-3 rounded-xl">
+                              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium line-clamp-2 italic">
+                                "{student.notes}"
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="mt-auto flex items-center justify-between pt-2 border-t border-zinc-200/50 dark:border-white/5">
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                               ID: {student.id.slice(0, 8)}
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setStudentHistoryId(student.id);
+                                }}
+                                className="p-2 text-blue-500 bg-blue-50 dark:bg-blue-500/10 rounded-xl hover:bg-blue-100 transition-colors"
+                              >
+                                <History className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingStudentId(student.id);
+                                  setEditStudentData({
+                                    name: student.name,
+                                    phone: student.phone || "",
+                                    email: student.email || "",
+                                    notes: student.notes || "",
+                                  });
+                                  setShowStudentModal("edit");
+                                }}
+                                className="p-2 text-amber-500 bg-amber-50 dark:bg-amber-500/10 rounded-xl hover:bg-amber-100 transition-colors"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteStudent(student.id)}
+                                className="p-2 text-rose-500 bg-rose-50 dark:bg-rose-500/10 rounded-xl hover:bg-rose-100 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {totalPages > 1 && (
+                        <div className="col-span-full flex justify-center items-center gap-3 mt-4">
+                          <button
+                            onClick={() => setStudentCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={studentCurrentPage === 1}
+                            className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold disabled:opacity-50 transition-all active:scale-95"
+                          >
+                            Anterior
+                          </button>
+                          <span className="text-sm font-bold text-zinc-500">
+                            {studentCurrentPage} / {totalPages}
+                          </span>
+                          <button
+                            onClick={() => setStudentCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={studentCurrentPage === totalPages}
+                            className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold disabled:opacity-50 transition-all active:scale-95"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
               </div>
