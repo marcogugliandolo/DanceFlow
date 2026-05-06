@@ -1597,7 +1597,7 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
                 <span className="text-zinc-500 font-medium text-sm">
                   ¡Hola de nuevo,{" "}
-                  <strong className="text-zinc-900 dark:text-white">Ana</strong>
+                  <strong className="text-zinc-900 dark:text-white">{profile.name || "Usuario"}</strong>
                   ! ✨
                 </span>
                 <input
