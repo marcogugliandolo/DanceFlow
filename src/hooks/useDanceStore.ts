@@ -50,6 +50,28 @@ export function useDanceStore(selectedMonth?: string) {
           const sessRaw = await sesRes.json();
           const stus = await stuRes.json();
 
+          // Data Migration from LocalStorage if server is empty
+          const localActs = JSON.parse(localStorage.getItem('dance_activities') || '[]');
+          const localSess = JSON.parse(localStorage.getItem('dance_sessions') || '[]');
+          const localStus = JSON.parse(localStorage.getItem('dance_students') || '[]');
+
+          if (acts.length === 0 && sessRaw.length === 0 && stus.length === 0 && 
+              (localActs.length > 0 || localSess.length > 0 || localStus.length > 0)) {
+            
+            // Push local data to the server
+            if (localActs.length > 0) await fetch('/api/activities', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localActs) });
+            if (localSess.length > 0) await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localSess) });
+            if (localStus.length > 0) await fetch('/api/students', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localStus) });
+            
+            setActivities(localActs);
+            setSessions(localSess);
+            setStudents(localStus);
+            
+            // Clear local storage after successful migration to prevent re-migrating? 
+            // Or just keep it as backup. We'll leave it for now but the server will have data next time.
+            return;
+          }
+
           setActivities(acts);
           setSessions(sessRaw);
           setStudents(stus);
