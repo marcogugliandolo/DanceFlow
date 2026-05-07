@@ -294,7 +294,12 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
 
   const setData = (data: { activities: Activity[], sessions: ClassSession[], students: Student[] }) => {
     setActivities(data.activities);
-    setSessions(data.sessions);
+    const validStudentIds = new Set(data.students.map(s => s.id));
+    const cleanSessions = data.sessions.map(s => ({
+      ...s,
+      attendeeIds: s.attendeeIds ? s.attendeeIds.filter(id => validStudentIds.has(id)) : []
+    }));
+    setSessions(cleanSessions);
     setStudents(data.students);
     lastLocalUpdate.current = Date.now();
   };

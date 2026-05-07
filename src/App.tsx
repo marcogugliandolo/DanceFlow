@@ -2902,39 +2902,37 @@ export default function App() {
                                       )}
                                       {session.status === "held" &&
                                         session.attendeeIds &&
-                                        session.attendeeIds.length > 0 && (
+                                        session.attendeeIds.length > 0 && (() => {
+                                          const validAttendees = session.attendeeIds
+                                            .map((id) => students.find((s) => s.id === id))
+                                            .filter((s) => s !== undefined) as Student[];
+                                          
+                                          if (validAttendees.length === 0) return null;
+                                          
+                                          return (
                                           <div className="relative group/attendees flex items-center">
                                             <span className="text-[11px] sm:text-xs font-semibold text-zinc-500 flex items-center cursor-help">
                                               <User className="w-3 h-3 mx-1" />{" "}
-                                              {session.attendeeIds.length}
+                                              {validAttendees.length}
                                             </span>
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] p-2 bg-zinc-900 dark:bg-white text-zinc-100 dark:text-zinc-900 text-xs rounded-xl shadow-xl opacity-0 invisible group-hover/attendees:opacity-100 group-hover/attendees:visible transition-all z-20 pointer-events-none">
                                               <div className="font-bold mb-1 border-b border-zinc-700 dark:border-zinc-200 pb-1">
                                                 Asistentes:
                                               </div>
                                               <div className="flex flex-col gap-0.5 mt-1 max-h-32 overflow-y-auto hidden-scrollbar">
-                                                {session.attendeeIds.map(
-                                                  (id) => {
-                                                    const student =
-                                                      students.find(
-                                                        (s) => s.id === id,
-                                                      );
-                                                    return (
-                                                      <span
-                                                        key={id}
-                                                        className="truncate"
-                                                      >
-                                                        {student?.name ||
-                                                          "Alumno eliminado"}
-                                                      </span>
-                                                    );
-                                                  },
-                                                )}
+                                                {validAttendees.map((student) => (
+                                                  <span
+                                                    key={student.id}
+                                                    className="truncate"
+                                                  >
+                                                    {student.name}
+                                                  </span>
+                                                ))}
                                               </div>
                                               <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-zinc-900 dark:border-t-white"></div>
                                             </div>
                                           </div>
-                                        )}
+                                        );})()}
 
                                       {session.status === "held" && (
                                         <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
