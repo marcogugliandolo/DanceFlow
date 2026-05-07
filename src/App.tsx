@@ -538,7 +538,10 @@ export default function App() {
       try {
         const res = await fetch('/api/auth/me');
         if (res.ok) {
-          const { user } = await res.json();
+          const { user, syncData } = await res.json();
+          if (syncData) {
+            setData(syncData);
+          }
           if (user) {
             setIsAuthenticated(true);
             setProfile({
@@ -567,7 +570,10 @@ export default function App() {
       if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
         const checkRes = await fetch('/api/auth/me');
         if (checkRes.ok) {
-          const { user } = await checkRes.json();
+          const { user, syncData } = await checkRes.json();
+          if (syncData) {
+            setData(syncData);
+          }
           if (user) {
             setIsAuthenticated(true);
             setProfile({
@@ -600,6 +606,7 @@ export default function App() {
     sessions,
     students,
     summary,
+    setData,
     addActivity,
     editActivity,
     addSession,
@@ -609,7 +616,7 @@ export default function App() {
     addStudent,
     editStudent,
     deleteStudent,
-  } = useDanceStore(dashboardMonth);
+  } = useDanceStore(dashboardMonth, isAuthenticated || false);
 
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "historial" | "alumnos" | "perfil"
@@ -707,7 +714,10 @@ export default function App() {
         body: JSON.stringify({ username, password })
       });
       if (res.ok) {
-        const { user } = await res.json();
+        const { user, syncData } = await res.json();
+        if (syncData) {
+          setData(syncData);
+        }
         setIsAuthenticated(true);
         setProfile({
           name: user.name,
@@ -818,7 +828,7 @@ export default function App() {
           : undefined,
       notes: sessionNotes || undefined,
       attendeeIds:
-        sessionStatus !== "cancelled_unbilled" ? sessionAttendeeIds : [],
+        sessionStatus === "held" ? sessionAttendeeIds : [],
     });
     setSessionActId("");
     setSessionDate("");
@@ -844,7 +854,7 @@ export default function App() {
           : undefined,
       notes: editSessionNotes || undefined,
       attendeeIds:
-        editSessionStatus !== "cancelled_unbilled"
+        editSessionStatus === "held"
           ? editSessionAttendeeIds
           : [],
     });
@@ -2282,7 +2292,7 @@ export default function App() {
                     </div>
 
                     <AnimatePresence mode="wait">
-                      {sessionStatus !== "cancelled_unbilled" && (
+                      {sessionStatus === "held" && (
                         <motion.div
                           key="held"
                           initial={{ height: 0, opacity: 0 }}
@@ -2778,8 +2788,8 @@ export default function App() {
                                       </span>
                                     </button>
                                   </div>
-                                  {editSessionStatus !==
-                                  "cancelled_unbilled" ? (
+                                  {editSessionStatus ===
+                                  "held" ? (
                                     <div className="flex flex-col gap-2">
                                       <button
                                         type="button"

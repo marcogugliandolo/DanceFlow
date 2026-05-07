@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Activity, ClassSession, SummaryStats, ActivityStats, Student } from '../types';
 
-export function useDanceStore(selectedMonth?: string) {
+export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean) {
   const [activities, setActivities] = useState<Activity[]>(() => {
     const saved = localStorage.getItem('dance_activities');
     return saved ? JSON.parse(saved) : [];
@@ -33,6 +33,8 @@ export function useDanceStore(selectedMonth?: string) {
 
   // Sync with Backend Server (Data + Telegram integration)
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const fetchData = async () => {
       // Don't poll if we just updated locally in the last 3 seconds
       if (Date.now() - lastLocalUpdate.current < 3000) {
@@ -40,15 +42,10 @@ export function useDanceStore(selectedMonth?: string) {
       }
 
       try {
-        const [actRes, sesRes, stuRes] = await Promise.all([
-          fetch('/api/activities', { cache: 'no-store' }),
-          fetch('/api/sessions', { cache: 'no-store' }),
-          fetch('/api/students', { cache: 'no-store' })
-        ]);
-        if (actRes.ok && sesRes.ok && stuRes.ok) {
-          const acts = await actRes.json();
-          const sessRaw = await sesRes.json();
-          const stus = await stuRes.json();
+        const syncRes = await fetch('/api/sync', { cache: 'no-store' });
+        
+        if (syncRes.ok) {
+          const { activities: acts, sessions: sessRaw, students: stus } = await syncRes.json();
 
           // Data Migration from LocalStorage if server is empty
           const localActs = JSON.parse(localStorage.getItem('dance_activities') || '[]');
@@ -88,7 +85,7 @@ export function useDanceStore(selectedMonth?: string) {
     // Poll the server every 5 seconds to get updates from Telegram bot
     const intervalId = setInterval(fetchData, 5000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isAuthenticated]);
 
   const syncActivity = async (a: Activity) => {
     lastLocalUpdate.current = Date.now();
@@ -295,11 +292,19 @@ export function useDanceStore(selectedMonth?: string) {
     return stats;
   }, [activities, sessions, selectedMonth]);
 
+  const setData = (data: { activities: Activity[], sessions: ClassSession[], students: Student[] }) => {
+    setActivities(data.activities);
+    setSessions(data.sessions);
+    setStudents(data.students);
+    lastLocalUpdate.current = Date.now();
+  };
+
   return {
     activities,
     sessions,
     students,
     summary,
+    setData,
     addActivity,
     editActivity,
     addSession,

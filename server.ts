@@ -25,6 +25,26 @@ if (!fs.existsSync(dataDir)) {
 // Database setup
 const db = new Database(path.join(dataDir, "salsanova.db"));
 
+function getSyncData(userId: string) {
+  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(userId);
+  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(userId);
+  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(userId);
+
+  return {
+    activities: activities.map((a: any) => ({ ...a, isRecurring: Boolean(a.isRecurring) })),
+    sessions: sessions.map((s: any) => {
+      let parsed = [];
+      if (s.attendeeIds) {
+        try {
+          parsed = JSON.parse(s.attendeeIds);
+        } catch (e) {}
+      }
+      return { ...s, attendeeIds: parsed };
+    }),
+    students
+  };
+}
+
 // Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS activities (
@@ -197,7 +217,17 @@ app.get("/api/auth/google/callback", async (req, res) => {
 });
 
 app.get("/api/auth/me", (req, res) => {
-  res.json({ user: ((req as any).session as any).user || null });
+  const user = ((req as any).session as any).user || null;
+  if (!user) {
+    return res.json({ user: null });
+  }
+  
+  try {
+    const syncData = getSyncData(user.id);
+    res.json({ user, syncData });
+  } catch (error) {
+    res.json({ user });
+  }
 });
 
 app.post("/api/auth/logout", (req, res) => {
@@ -236,7 +266,12 @@ app.post("/api/auth/login", (req, res) => {
       user = { id, name: "Profesor", email: "profesor@ejemplo.com" };
     }
     ((req as any).session as any).user = user;
-    return res.json({ success: true, user });
+    try {
+      const syncData = getSyncData(user.id);
+      return res.json({ success: true, user, syncData });
+    } catch {
+      return res.json({ success: true, user });
+    }
   }
   res.status(401).json({ error: "Invalid credentials" });
 });
@@ -616,6 +651,18 @@ app.delete("/api/students/:id", requireAuth, (req, res) => {
   } catch (err: any) {
     console.error("DELETE student error:", err);
     res.status(500).json({ error: "DB Error", details: err.message });
+  }
+});
+
+// Fast Sync Data Route
+app.get("/api/sync", requireAuth, (req, res) => {
+  const user = ((req as any).session as any).user;
+  
+  try {
+    const syncData = getSyncData(user.id);
+    res.json(syncData);
+  } catch (error) {
+    res.status(500).json({ error: "Sync failed" });
   }
 });
 
