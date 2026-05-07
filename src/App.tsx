@@ -628,6 +628,7 @@ export default function App() {
   const [newActName, setNewActName] = useState("");
   const [newActLocation, setNewActLocation] = useState("");
   const [newActPrice, setNewActPrice] = useState("");
+  const [newActDefaultDuration, setNewActDefaultDuration] = useState("1");
   const [newActPaymentType, setNewActPaymentType] = useState<
     "fixed" | "monthly"
   >("fixed");
@@ -637,6 +638,7 @@ export default function App() {
   const [editActName, setEditActName] = useState("");
   const [editActLocation, setEditActLocation] = useState("");
   const [editActPrice, setEditActPrice] = useState("");
+  const [editActDefaultDuration, setEditActDefaultDuration] = useState("1");
   const [editActPaymentType, setEditActPaymentType] = useState<
     "fixed" | "monthly"
   >("fixed");
@@ -778,12 +780,14 @@ export default function App() {
       name: newActName,
       location: newActLocation,
       pricePerClass: parseFloat(newActPrice),
+      defaultDuration: parseFloat(newActDefaultDuration) || 1,
       paymentType: newActPaymentType,
       isRecurring: newActPaymentType === "monthly" ? newActIsRecurring : false,
     });
     setNewActName("");
     setNewActLocation("");
     setNewActPrice("");
+    setNewActDefaultDuration("1");
     setNewActPaymentType("fixed");
     setNewActIsRecurring(false);
     setIsCreatingActivity(false);
@@ -797,6 +801,7 @@ export default function App() {
       name: editActName,
       location: editActLocation,
       pricePerClass: parseFloat(editActPrice),
+      defaultDuration: parseFloat(editActDefaultDuration) || 1,
       paymentType: editActPaymentType,
       isRecurring:
         editActPaymentType === "monthly" ? editActIsRecurring : false,
@@ -809,6 +814,7 @@ export default function App() {
     setEditActName(activity.name);
     setEditActLocation(activity.location);
     setEditActPrice(activity.pricePerClass.toString());
+    setEditActDefaultDuration(activity.defaultDuration?.toString() || "1");
     setEditActPaymentType(activity.paymentType || "fixed");
     setEditActIsRecurring(activity.isRecurring || false);
   };
@@ -977,9 +983,10 @@ export default function App() {
 
       let amount = 0;
       if (activity.paymentType !== "monthly") {
-        if (s.status === "held") amount = activity.pricePerClass;
+        const durationFactor = (s.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
+        if (s.status === "held") amount = activity.pricePerClass * durationFactor;
         else if (s.status === "cancelled_billed")
-          amount = activity.pricePerClass;
+          amount = activity.pricePerClass * durationFactor;
       }
 
       if (!groupedMap.has(activity.id)) {
@@ -1792,6 +1799,15 @@ export default function App() {
                               onChange={(e) => setNewActPrice(e.target.value)}
                               className="w-full sm:w-32 min-w-0 h-[52px] sm:h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
                             />
+                            <input
+                              required
+                              type="number"
+                              step="0.25"
+                              placeholder="Duración (h)"
+                              value={newActDefaultDuration}
+                              onChange={(e) => setNewActDefaultDuration(e.target.value)}
+                              className="w-full sm:w-32 min-w-0 h-[52px] sm:h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                            />
                             <button
                               type="submit"
                               className="w-full sm:w-auto px-8 h-[52px] sm:h-12 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white shadow-lg shadow-rose-500/20 text-sm font-bold rounded-2xl hover:opacity-90 active:scale-95 transition-all"
@@ -1966,6 +1982,19 @@ export default function App() {
                                                 value={editActPrice}
                                                 onChange={(e) =>
                                                   setEditActPrice(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                className="flex-1 min-w-0 h-[52px] sm:h-10 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 rounded-xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
+                                              />
+                                              <input
+                                                required
+                                                type="number"
+                                                step="0.25"
+                                                placeholder="Dur. (h)"
+                                                value={editActDefaultDuration}
+                                                onChange={(e) =>
+                                                  setEditActDefaultDuration(
                                                     e.target.value,
                                                   )
                                                 }
@@ -2169,6 +2198,10 @@ export default function App() {
                           const actId = e.target.value;
                           setSessionActId(actId);
                           if (actId) {
+                            const act = activities.find(a => a.id === actId);
+                            if (act) {
+                              setSessionDuration(act.defaultDuration || 1);
+                            }
                             const previousSessions = sessions.filter(s => s.activityId === actId);
                             if (previousSessions.length > 0) {
                               const latestSession = previousSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
@@ -2178,6 +2211,7 @@ export default function App() {
                             }
                           } else {
                             setSessionAttendeeIds([]);
+                            setSessionDuration(1);
                           }
                         }}
                         className="w-full min-w-0 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 pr-10 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-rose-500 dark:focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all appearance-none cursor-pointer text-zinc-800 dark:text-zinc-100 shadow-sm overflow-hidden text-ellipsis"

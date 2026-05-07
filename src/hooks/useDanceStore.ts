@@ -254,10 +254,11 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
       }
 
       if (session.status === 'held') {
-        // Calculate revenue based on payment type
+        // Calculate revenue based on payment type and duration
         let sessionRevenue = 0;
         if (activity.paymentType !== 'monthly') {
-          sessionRevenue = activity.pricePerClass;
+          const durationFactor = (session.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
+          sessionRevenue = activity.pricePerClass * durationFactor;
         }
         
         stats.totalHeld++;
@@ -275,7 +276,8 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
         if (session.status === 'cancelled_billed') {
           let cancelRevenue = 0;
           if (activity.paymentType !== 'monthly') {
-             cancelRevenue = activity.pricePerClass;
+             const durationFactor = (session.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
+             cancelRevenue = activity.pricePerClass * durationFactor;
           }
 
           stats.totalBilled++;

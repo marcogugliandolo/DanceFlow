@@ -7,6 +7,7 @@ export interface Activity {
   pricePerClass: number; // e.g., 25.50
   paymentType?: 'fixed' | 'monthly';
   isRecurring?: boolean;
+  defaultDuration?: number;
 }
 
 export interface Student {
