@@ -75,7 +75,8 @@ db.exec(`
     name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
-    notes TEXT
+    notes TEXT,
+    location TEXT
   );
 
   CREATE TABLE IF NOT EXISTS users (
@@ -96,6 +97,7 @@ const tryAlterTable = (sql: string) => {
 tryAlterTable("ALTER TABLE students ADD COLUMN phone TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN email TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN notes TEXT;");
+tryAlterTable("ALTER TABLE students ADD COLUMN location TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN duration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN user_id TEXT;");
@@ -614,12 +616,12 @@ app.get("/api/students", requireAuth, (req, res) => {
 app.post("/api/students", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const students = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location) VALUES (?, ?, ?, ?, ?, ?, ?)");
   
   try {
     db.transaction(() => {
       for (const s of students) {
-        insert.run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null);
+        insert.run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
       }
     })();
     res.json({ success: true });
@@ -634,8 +636,8 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const s = req.body;
   try {
-    db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null);
+    db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
     res.json({ success: true, student: s });
   } catch (err: any) {
     console.error("POST student error:", err);
@@ -645,8 +647,26 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
 
 app.delete("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
+  const studentId = req.params.id;
   try {
-    db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    db.transaction(() => {
+      db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(studentId, user.id);
+      
+      const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
+      const updateSession = db.prepare("UPDATE class_sessions SET attendeeIds = ? WHERE id = ? AND user_id = ?");
+      
+      for (const s of sessions as any[]) {
+        if (s.attendeeIds) {
+          try {
+            const parsed = JSON.parse(s.attendeeIds);
+            if (Array.isArray(parsed) && parsed.includes(studentId)) {
+              const nextIds = parsed.filter(id => id !== studentId);
+              updateSession.run(JSON.stringify(nextIds), s.id, user.id);
+            }
+          } catch (e) {}
+        }
+      }
+    })();
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE student error:", err);
@@ -664,6 +684,10 @@ app.get("/api/sync", requireAuth, (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Sync failed" });
   }
+});
+
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: "API route not found: " + req.path });
 });
 
 // Start Server

@@ -670,7 +670,6 @@ export default function App() {
     "create" | "edit" | null
   >(null);
   const [showStudentModal, setShowStudentModal] = useState<"create" | "edit" | null>(null);
-  const [newStudentName, setNewStudentName] = useState("");
   const [studentHistoryId, setStudentHistoryId] = useState<string | null>(null);
   const [studentHistoryPage, setStudentHistoryPage] = useState(1);
   const [studentHistorySearchQuery, setStudentHistorySearchQuery] =
@@ -681,7 +680,8 @@ export default function App() {
     phone: string;
     email: string;
     notes: string;
-  }>({ name: "", phone: "", email: "", notes: "" });
+    location: string;
+  }>({ name: "", phone: "", email: "", notes: "", location: "" });
 
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [studentCurrentPage, setStudentCurrentPage] = useState(1);
@@ -3082,7 +3082,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setEditingStudentId(null);
-                      setEditStudentData({ name: "", phone: "", email: "", notes: "" });
+                      setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
                       setShowStudentModal("create");
                     }}
                     className="h-11 px-6 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl flex items-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
@@ -3115,7 +3115,8 @@ export default function App() {
                     filtered = filtered.filter(s => 
                       s.name.toLowerCase().includes(q) || 
                       (s.email || "").toLowerCase().includes(q) ||
-                      (s.phone || "").includes(q)
+                      (s.phone || "").includes(q) ||
+                      (s.location || "").toLowerCase().includes(q)
                     );
                   }
 
@@ -3167,6 +3168,12 @@ export default function App() {
                                     {student.email}
                                   </span>
                                 )}
+                                {student.location && (
+                                  <span className="text-[11px] font-medium text-zinc-500 flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {student.location}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -3200,6 +3207,7 @@ export default function App() {
                                     phone: student.phone || "",
                                     email: student.email || "",
                                     notes: student.notes || "",
+                                    location: student.location || "",
                                   });
                                   setShowStudentModal("edit");
                                 }}
@@ -3298,25 +3306,34 @@ export default function App() {
                   e.preventDefault();
                   if (editStudentData.name.trim()) {
                     if (showStudentModal === "create") {
+                      const newId = crypto.randomUUID();
                       addStudent({
-                        id: crypto.randomUUID(),
+                        id: newId,
                         name: editStudentData.name.trim(),
                         phone: editStudentData.phone.trim(),
                         email: editStudentData.email.trim(),
                         notes: editStudentData.notes.trim(),
+                        location: editStudentData.location.trim(),
                       });
+                      if (showAttendeesModal === "create") {
+                        setSessionAttendeeIds(prev => [...prev, newId]);
+                      } else if (showAttendeesModal === "edit") {
+                        setEditSessionAttendeeIds(prev => [...prev, newId]);
+                      }
                     } else if (editingStudentId) {
                       editStudent(editingStudentId, {
                         name: editStudentData.name.trim(),
                         phone: editStudentData.phone.trim(),
                         email: editStudentData.email.trim(),
                         notes: editStudentData.notes.trim(),
+                        location: editStudentData.location.trim(),
                       });
                     }
                     setShowStudentModal(null);
                     setEditingStudentId(null);
-                    setEditStudentData({ name: "", phone: "", email: "", notes: "" });
+                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
                   }
+
                 }}
                 className="p-6 space-y-4"
               >
@@ -3354,6 +3371,17 @@ export default function App() {
                       placeholder="alumno@email.com"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Ubicación</label>
+                  <input
+                    type="text"
+                    value={editStudentData.location}
+                    onChange={(e) => setEditStudentData(d => ({ ...d, location: e.target.value }))}
+                    className="w-full h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
+                    placeholder="Ciudad, barrio..."
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -3419,35 +3447,17 @@ export default function App() {
               </div>
 
               <div className="p-4 flex-1 overflow-y-auto">
-                <div className="flex gap-2 mb-6">
-                  <input
-                    type="text"
-                    placeholder="Nuevo asistente..."
-                    value={newStudentName}
-                    onChange={(e) => setNewStudentName(e.target.value)}
-                    className="flex-1 bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-rose-500/50 text-zinc-900 dark:text-zinc-100 text-sm font-medium"
-                  />
-                  <button
-                    onClick={() => {
-                      if (newStudentName.trim()) {
-                        const id = crypto.randomUUID();
-                        addStudent({ id, name: newStudentName.trim() });
-                        setNewStudentName("");
-                        if (showAttendeesModal === "create") {
-                          setSessionAttendeeIds([...sessionAttendeeIds, id]);
-                        } else {
-                          setEditSessionAttendeeIds([
-                            ...editSessionAttendeeIds,
-                            id,
-                          ]);
-                        }
-                      }
-                    }}
-                    className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-3 rounded-xl font-bold flex items-center justify-center transition-transform active:scale-95"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setEditingStudentId(null);
+                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
+                    setShowStudentModal("create");
+                  }}
+                  className="w-full mb-6 h-12 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nuevo Alumno / Asistente
+                </button>
 
                 <div className="space-y-2">
                   {students.length === 0 ? (
@@ -3492,9 +3502,10 @@ export default function App() {
                             </span>
                             {(student.phone ||
                               student.email ||
+                              student.location ||
                               student.notes) && (
                               <span className="text-xs text-zinc-500 truncate">
-                                {[student.phone, student.email, student.notes]
+                                {[student.phone, student.email, student.location, student.notes]
                                   .filter(Boolean)
                                   .join(" • ")}
                               </span>
@@ -3521,7 +3532,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {studentHistoryId && (
+        {studentHistoryId && students.find(s => s.id === studentHistoryId) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

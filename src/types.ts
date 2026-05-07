@@ -15,6 +15,7 @@ export interface Student {
   phone?: string;
   email?: string;
   notes?: string;
+  location?: string;
 }
 
 export interface ClassSession {
