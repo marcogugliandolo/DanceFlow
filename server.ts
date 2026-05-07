@@ -648,13 +648,16 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
 app.delete("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const studentId = req.params.id;
+  console.log("==> DELETING STUDENT:", studentId, "USER:", user.id);
   try {
     db.transaction(() => {
+      console.log("==> Inside transaction!");
       db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(studentId, user.id);
       
       const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
       const updateSession = db.prepare("UPDATE class_sessions SET attendeeIds = ? WHERE id = ? AND user_id = ?");
       
+      let updatedCount = 0;
       for (const s of sessions as any[]) {
         if (s.attendeeIds) {
           try {
@@ -662,10 +665,14 @@ app.delete("/api/students/:id", requireAuth, (req, res) => {
             if (Array.isArray(parsed) && parsed.includes(studentId)) {
               const nextIds = parsed.filter(id => id !== studentId);
               updateSession.run(JSON.stringify(nextIds), s.id, user.id);
+              updatedCount++;
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error("JSON parse error for session", s.id);
+          }
         }
       }
+      console.log("==> Students deleted and", updatedCount, "sessions updated");
     })();
     res.json({ success: true });
   } catch (err: any) {

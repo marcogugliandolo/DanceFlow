@@ -71,7 +71,20 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
           }
 
           setActivities(acts);
-          setSessions(sessRaw);
+          const validStudentIds = new Set(stus.map((s: any) => s.id));
+          const cleanSessions = sessRaw.map((s: any) => {
+            let parsed = s.attendeeIds;
+            if (typeof parsed === 'string') {
+               try { parsed = JSON.parse(parsed); } catch(e) { parsed = []; }
+            }
+            if (!Array.isArray(parsed)) parsed = [];
+            
+            return {
+              ...s,
+              attendeeIds: parsed.filter((id: string) => validStudentIds.has(id))
+            };
+          });
+          setSessions(cleanSessions);
           setStudents(stus);
         }
       } catch (err) {
@@ -177,9 +190,7 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
       const nextSessions = prev.map(s => {
         if (s.attendeeIds && s.attendeeIds.includes(id)) {
           changed = true;
-          const newS = { ...s, attendeeIds: s.attendeeIds.filter(aid => aid !== id) };
-          syncSession(newS);
-          return newS;
+          return { ...s, attendeeIds: s.attendeeIds.filter(aid => aid !== id) };
         }
         return s;
       });
