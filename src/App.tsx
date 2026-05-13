@@ -3,7 +3,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoBase64 from "./logo";
 import { useDanceStore } from "./hooks/useDanceStore";
-import { ClassStatus } from "./types";
+import { isValidDateStr, safeFormat } from "./lib/dateUtils";
+import { ClassStatus, Student } from "./types";
 import { motion, AnimatePresence } from "motion/react";
 import Holidays from "date-holidays";
 
@@ -92,6 +93,7 @@ const ProfileView = ({
           email: user.email,
           avatarUrl: user.avatar_url || "",
           theme: user.theme || "dark",
+          role: user.role || "user",
         });
         setIsEditing(false);
       }
@@ -226,8 +228,8 @@ const ProfileView = ({
                   <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white break-words">
                     {profile.name}
                   </h3>
-                  <span className="px-2.5 py-1 bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest rounded-lg">
-                    Rol: Profesor
+                  <span className={`px-2.5 py-1 ${profile.role === 'admin' ? 'bg-fuchsia-100 dark:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400'} text-[10px] font-black uppercase tracking-widest rounded-lg`}>
+                    Rol: {profile.role === 'admin' ? 'Super Admin' : 'Profesor'}
                   </span>
                 </div>
                 <p className="text-sm font-medium text-zinc-500 break-all mt-1">
@@ -470,6 +472,7 @@ const ProfileView = ({
   );
 };
 
+import { AttendanceView } from "./components/AttendanceView";
 import {
   CalendarDays,
   CheckCircle2,
@@ -498,6 +501,7 @@ import {
   CircleUserRound,
   Grid,
   Check,
+  Shield,
 } from "lucide-react";
 
 const cardVariants = {
@@ -517,17 +521,202 @@ const containerVariants = {
   },
 };
 
+const AdminPanel = ({ profile }: { profile: any }) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [userData, setUserData] = useState<any | null>(null);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleRoleToggle = async (id: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    try {
+      await fetch(`/api/admin/users/${id}/role`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole })
+      });
+      fetchUsers();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleViewDetails = async (id: string) => {
+    try {
+      setUserData(null);
+      const res = await fetch(`/api/admin/users/${id}/data`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedUser(data.user);
+        setUserData(data.syncData);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-zinc-500">Cargando panel de administración...</div>;
+
+  if (selectedUser && userData) {
+    return (
+      <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
+        <button onClick={() => setSelectedUser(null)} className="self-start text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors">
+          &larr; Volver a todos los usuarios
+        </button>
+        <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl p-6 shadow-sm">
+          <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 mb-2">
+            Datos de {selectedUser.name}
+          </h2>
+          <p className="text-zinc-500 text-sm mb-6">{selectedUser.email}</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+              <div className="text-3xl font-black text-rose-500">{userData.activities?.length || 0}</div>
+              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Actividades</div>
+            </div>
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+              <div className="text-3xl font-black text-rose-500">{userData.sessions?.length || 0}</div>
+              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Clases</div>
+            </div>
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+              <div className="text-3xl font-black text-rose-500">{userData.students?.length || 0}</div>
+              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Alumnos</div>
+            </div>
+          </div>
+
+          <h3 className="text-xl font-bold mb-4">Clases Programadas</h3>
+          <div className="flex flex-col gap-3">
+            {userData.sessions?.map((s: any) => {
+              const act = userData.activities?.find((a: any) => a.id === s.activityId);
+              return (
+                <div key={s.id} className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
+                  <div>
+                    <div className="font-bold">{act?.name || 'Desconocida'}</div>
+                    <div className="text-sm text-zinc-500">{s.date} - Duración: {s.duration || 1}h</div>
+                  </div>
+                  <div className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${s.status === 'held' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                    {s.status === 'held' ? 'Realizada' : 'Cancelada'}
+                  </div>
+                </div>
+              );
+            })}
+            {(!userData.sessions || userData.sessions.length === 0) && (
+              <p className="text-zinc-500 text-sm">Este profesor no tiene clases registradas.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center">
+          <Shield className="w-6 h-6 text-rose-500" />
+        </div>
+        <div>
+          <h2 className="text-3xl font-black text-zinc-900 dark:text-white">Panel Super Admin</h2>
+          <p className="text-zinc-500 text-sm font-medium">Gestiona todos los profesores y sus datos en la plataforma.</p>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/5 rounded-3xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200/50 dark:border-zinc-700/50 text-zinc-500">
+              <tr>
+                <th className="px-6 py-4 font-bold">Usuario</th>
+                <th className="px-6 py-4 font-bold text-center">Rol</th>
+                <th className="px-6 py-4 font-bold text-center">Última Actividad</th>
+                <th className="px-6 py-4 font-bold text-center">Stats</th>
+                <th className="px-6 py-4 font-bold text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {u.avatar_url ? (
+                        <img src={u.avatar_url} className="w-10 h-10 rounded-full object-cover" alt="" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-zinc-500 font-bold uppercase">{u.name?.charAt(0) || 'U'}</div>
+                      )}
+                      <div>
+                        <div className="font-bold text-zinc-900 dark:text-zinc-100">{u.name}</div>
+                        <div className="text-xs text-zinc-500">{u.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button 
+                      onClick={() => handleRoleToggle(u.id, u.role)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${u.role === 'admin' ? 'bg-fuchsia-100 text-fuchsia-600 hover:bg-fuchsia-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'}`}
+                    >
+                      {u.role === 'admin' ? 'Admin' : 'Profesor'}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="text-xs text-zinc-500">
+                      {u.last_active ? new Date(u.last_active).toLocaleString() : 'Desconocida'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex gap-2 justify-center text-xs font-bold text-zinc-500">
+                      <span title="Actividades">{u.activitiesCount} A</span>
+                      <span>·</span>
+                      <span title="Sesiones">{u.sessionsCount} S</span>
+                      <span>·</span>
+                      <span title="Alumnos">{u.studentsCount} U</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => handleViewDetails(u.id)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold text-xs rounded-xl active:scale-95 transition-all">
+                      Ver Clases
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [profile, setProfile] = useState<{
     name: string;
     email: string;
     avatarUrl: string;
     theme: 'light' | 'dark';
+    role?: string;
   }>({
     name: "Profesor",
     email: "profesor@ejemplo.com",
     avatarUrl: "",
     theme: "dark",
+    role: "user",
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -537,7 +726,8 @@ export default function App() {
     const checkAuth = async () => {
       try {
         const res = await fetch('/api/auth/me');
-        if (res.ok) {
+        const contentType = res.headers.get("content-type");
+        if (res.ok && contentType && contentType.includes("application/json")) {
           const { user, syncData } = await res.json();
           if (syncData) {
             setData(syncData);
@@ -549,6 +739,7 @@ export default function App() {
               email: user.email,
               avatarUrl: user.avatar_url || "",
               theme: user.theme || "dark",
+              role: user.role || "user",
             });
             setIsDarkMode(user.theme === "dark");
           } else {
@@ -569,7 +760,8 @@ export default function App() {
     const handleMessage = async (event: MessageEvent) => {
       if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
         const checkRes = await fetch('/api/auth/me');
-        if (checkRes.ok) {
+        const contentType = checkRes.headers.get("content-type");
+        if (checkRes.ok && contentType && contentType.includes("application/json")) {
           const { user, syncData } = await checkRes.json();
           if (syncData) {
             setData(syncData);
@@ -581,6 +773,7 @@ export default function App() {
               email: user.email,
               avatarUrl: user.avatar_url || "",
               theme: user.theme || "dark",
+              role: user.role || "user",
             });
             setIsDarkMode(user.theme === "dark");
           }
@@ -726,6 +919,7 @@ export default function App() {
           email: user.email,
           avatarUrl: user.avatar_url || "",
           theme: user.theme || "dark",
+          role: user.role || "user",
         });
         setIsDarkMode(user.theme === "dark");
         setUsername("");
@@ -779,7 +973,7 @@ export default function App() {
     addActivity({
       name: newActName,
       location: newActLocation,
-      pricePerClass: parseFloat(newActPrice),
+      pricePerClass: parseFloat(newActPrice) || 0,
       defaultDuration: parseFloat(newActDefaultDuration) || 1,
       paymentType: newActPaymentType,
       isRecurring: newActPaymentType === "monthly" ? newActIsRecurring : false,
@@ -800,7 +994,7 @@ export default function App() {
     editActivity(editingActId, {
       name: editActName,
       location: editActLocation,
-      pricePerClass: parseFloat(editActPrice),
+      pricePerClass: parseFloat(editActPrice) || 0,
       defaultDuration: parseFloat(editActDefaultDuration) || 1,
       paymentType: editActPaymentType,
       isRecurring:
@@ -811,9 +1005,9 @@ export default function App() {
 
   const startEditingActivity = (activity: any) => {
     setEditingActId(activity.id);
-    setEditActName(activity.name);
-    setEditActLocation(activity.location);
-    setEditActPrice(activity.pricePerClass.toString());
+    setEditActName(activity.name || "");
+    setEditActLocation(activity.location || "");
+    setEditActPrice(activity.pricePerClass?.toString() || "0");
     setEditActDefaultDuration(activity.defaultDuration?.toString() || "1");
     setEditActPaymentType(activity.paymentType || "fixed");
     setEditActIsRecurring(activity.isRecurring || false);
@@ -869,10 +1063,10 @@ export default function App() {
 
   const startEditingSession = (session: any) => {
     setEditingSessionId(session.id);
-    setEditSessionActId(session.activityId);
-    setEditSessionDate(session.date);
+    setEditSessionActId(session.activityId || "");
+    setEditSessionDate(session.date || "");
     setEditSessionDuration(session.duration ?? 1);
-    setEditSessionStatus(session.status);
+    setEditSessionStatus(session.status || "held");
     setEditSessionJustification(session.justification || "");
     setEditSessionNotes(session.notes || "");
     setEditSessionAttendeeIds(session.attendeeIds || []);
@@ -946,7 +1140,7 @@ export default function App() {
     }
 
     filtered.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
     );
 
     let totalRevenue = 0;
@@ -957,7 +1151,7 @@ export default function App() {
       if (!activity) return;
       if (activity.paymentType !== "monthly") {
         if (s.status === "held" || s.status === "cancelled_billed") {
-          totalRevenue += activity.pricePerClass;
+          totalRevenue += (activity.pricePerClass || 0);
         }
       }
     });
@@ -984,9 +1178,9 @@ export default function App() {
       let amount = 0;
       if (activity.paymentType !== "monthly") {
         const durationFactor = (s.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
-        if (s.status === "held") amount = activity.pricePerClass * durationFactor;
+        if (s.status === "held") amount = (activity.pricePerClass || 0) * durationFactor;
         else if (s.status === "cancelled_billed")
-          amount = activity.pricePerClass * durationFactor;
+          amount = (activity.pricePerClass || 0) * durationFactor;
       }
 
       if (!groupedMap.has(activity.id)) {
@@ -1031,17 +1225,12 @@ export default function App() {
 
       // Sort sessions chronologically for parallel lines
       sessions.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
       );
 
       const dateLines = sessions
         .map((s) => {
-          const dateObj = new Date(s.date);
-          return dateObj.toLocaleDateString("es-ES", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
+          return safeFormat(s.date, "dd/MM/yyyy");
         })
         .join("\n");
 
@@ -1143,7 +1332,7 @@ export default function App() {
 
     const monthlyRec = monthlyActs
       .filter((a) => a.isRecurring)
-      .reduce((ac, a) => ac + a.pricePerClass * numMonths, 0);
+      .reduce((ac, a) => ac + (a.pricePerClass || 0) * numMonths, 0);
     const monthlyNonRec = monthlyActs
       .filter((a) => !a.isRecurring)
       .reduce((ac, a) => {
@@ -1156,7 +1345,7 @@ export default function App() {
             return `${d.getFullYear()}-${d.getMonth()}`;
           }),
         );
-        return ac + a.pricePerClass * uniqueMonths.size;
+        return ac + (a.pricePerClass || 0) * uniqueMonths.size;
       }, 0);
     const totalWithMonthly = totalRevenue + monthlyRec + monthlyNonRec;
     const globalTotalHours = filtered.reduce(
@@ -1483,7 +1672,7 @@ export default function App() {
 
           {/* Menú de pestañas - Desktop */}
           <div className="hidden lg:flex w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
-            {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
+            {([...(["dashboard", "asistencia", "historial", "alumnos", "perfil"]), ...(profile.role === 'admin' ? ['admin'] : [])]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1511,6 +1700,10 @@ export default function App() {
                     <History className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : tab === "alumnos" ? (
                     <User className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
+                  ) : tab === "admin" ? (
+                    <Shield className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
+                  ) : tab === "asistencia" ? (
+                    <CheckCircle2 className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : profile.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -1559,7 +1752,7 @@ export default function App() {
               className="lg:hidden mt-2 mx-auto max-w-6xl"
             >
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-700/50 rounded-3xl p-2 shadow-xl flex flex-col gap-1 mx-2">
-                {(["dashboard", "historial", "alumnos", "perfil"] as const).map((tab) => (
+                {([...(["dashboard", "asistencia", "historial", "alumnos", "perfil"]), ...(profile.role === 'admin' ? ['admin'] : [])]).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => {
@@ -1578,6 +1771,10 @@ export default function App() {
                       <History className="w-5 h-5 opacity-70" />
                     ) : tab === "alumnos" ? (
                       <User className="w-5 h-5 opacity-70" />
+                    ) : tab === "admin" ? (
+                      <Shield className="w-5 h-5 opacity-70" />
+                    ) : tab === "asistencia" ? (
+                      <CheckCircle2 className="w-5 h-5 opacity-70" />
                     ) : profile.avatarUrl ? (
                       <img
                         src={profile.avatarUrl}
@@ -2204,7 +2401,7 @@ export default function App() {
                             }
                             const previousSessions = sessions.filter(s => s.activityId === actId);
                             if (previousSessions.length > 0) {
-                              const latestSession = previousSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                              const latestSession = previousSessions.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())[0];
                               setSessionAttendeeIds(latestSession.attendeeIds || []);
                             } else {
                               setSessionAttendeeIds([]);
@@ -2402,6 +2599,21 @@ export default function App() {
                   </form>
                 </div>
               </div>
+            </motion.div>
+          ) : activeTab === "asistencia" ? (
+            <motion.div
+              key="asistencia"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.15 }}
+            >
+              <AttendanceView 
+                activities={activities} 
+                sessions={sessions} 
+                students={students} 
+                editSession={editSession} 
+              />
             </motion.div>
           ) : activeTab === "historial" ? (
             <motion.div
@@ -2645,7 +2857,7 @@ export default function App() {
 
                   filteredSessions.sort(
                     (a, b) =>
-                      new Date(b.date).getTime() - new Date(a.date).getTime(),
+                      new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
                   );
 
                   const totalPages = Math.ceil(
@@ -2905,16 +3117,14 @@ export default function App() {
                                 <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
                                   <div className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-zinc-200/50 dark:border-zinc-700/50">
                                     <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                                      {new Date(
-                                        session.date,
-                                      ).toLocaleDateString("es-ES", {
-                                        month: "short",
-                                      })}
+                                      {isValidDateStr(session.date)
+                                        ? safeFormat(session.date, "MMM").replace(".", "")
+                                        : "INV"}
                                     </span>
                                     <span className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white leading-none mt-0.5">
-                                      {activity?.paymentType === "monthly"
-                                        ? new Date(session.date).getFullYear()
-                                        : new Date(session.date).getDate()}
+                                      {isValidDateStr(session.date) ? (activity?.paymentType === "monthly"
+                                        ? safeFormat(session.date, "yyyy")
+                                        : safeFormat(session.date, "d")) : "-"}
                                     </span>
                                   </div>
                                   <div>
@@ -3001,8 +3211,8 @@ export default function App() {
                                           <circle cx="12" cy="12" r="10" />
                                           <polyline points="12 6 12 12 16 14" />
                                         </svg>
-                                        {session.duration ?? 1}{" "}
-                                        {session.duration === 1
+                                        {Number(session.duration) || 1}{" "}
+                                        {Number(session.duration) === 1 || !session.duration
                                           ? "hora"
                                           : "horas"}
                                       </span>
@@ -3299,6 +3509,16 @@ export default function App() {
                 setProfile={setProfile}
               />
             </motion.div>
+          ) : activeTab === "admin" && profile.role === "admin" ? (
+            <motion.div
+              key="admin"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.15 }}
+            >
+              <AdminPanel profile={profile} />
+            </motion.div>
           ) : null}
         </AnimatePresence>
       </main>
@@ -3586,7 +3806,7 @@ export default function App() {
                   .filter((s) => s.attendeeIds?.includes(student.id))
                   .sort(
                     (a, b) =>
-                      new Date(b.date).getTime() - new Date(a.date).getTime(),
+                      new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
                   );
 
                 // Agrupar contador por actividad
@@ -3721,26 +3941,28 @@ export default function App() {
                                       (a) => a.id === session.activityId,
                                     );
                                     const isHeld = session.status === "held";
-                                    const dateObj = new Date(session.date);
-                                    const formattedDate =
-                                      dateObj.toLocaleDateString("es-ES", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                      });
+                                    const hasValidDate = isValidDateStr(session.date);
 
                                     return (
                                       <div
                                         key={session.id}
                                         className="flex items-center p-3 sm:p-4 bg-white dark:bg-zinc-800/80 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm transition-all hover:shadow-md"
                                       >
-                                        <div className="flex flex-col items-center justify-center w-12 h-12 bg-zinc-100 dark:bg-zinc-900 rounded-xl mr-3 sm:mr-4 border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
-                                          <span className="text-[10px] font-bold text-zinc-400 uppercase">
-                                            {formattedDate.split(" ")[1]}
-                                          </span>
-                                          <span className="text-lg font-black text-zinc-700 dark:text-zinc-200 leading-none">
-                                            {formattedDate.split(" ")[0]}
-                                          </span>
+                                        <div className="flex flex-col items-center justify-center w-12 h-12 bg-zinc-100 dark:bg-zinc-900 rounded-xl mr-3 sm:mr-4 border border-zinc-200 dark:border-zinc-700 flex-shrink-0 text-center">
+                                          {hasValidDate ? (
+                                            <>
+                                              <span className="text-[10px] font-bold text-zinc-400 uppercase leading-none mb-0.5">
+                                                {safeFormat(session.date, "MMM").replace(".", "")}
+                                              </span>
+                                              <span className="text-lg font-black text-zinc-700 dark:text-zinc-200 leading-none">
+                                                {safeFormat(session.date, "d")}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase leading-tight">
+                                              N/A
+                                            </span>
+                                          )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">

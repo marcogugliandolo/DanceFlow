@@ -44,7 +44,8 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
       try {
         const syncRes = await fetch('/api/sync', { cache: 'no-store' });
         
-        if (syncRes.ok) {
+        const contentType = syncRes.headers.get("content-type");
+        if (syncRes.ok && contentType && contentType.includes("application/json")) {
           const { activities: acts, sessions: sessRaw, students: stus } = await syncRes.json();
 
           // Data Migration from LocalStorage if server is empty
@@ -151,11 +152,11 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
     syncSession(newS);
   };
 
-  const editSession = (id: string, updatedSession: Omit<ClassSession, 'id'>) => {
-    const newS = { ...updatedSession, id };
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? newS : s))
-    );
+  const editSession = (id: string, updatedSession: Partial<ClassSession>) => {
+    const existing = sessions.find(s => s.id === id);
+    if (!existing) return;
+    const newS = { ...existing, ...updatedSession, id } as ClassSession;
+    setSessions((prev) => prev.map((s) => (s.id === id ? newS : s)));
     syncSession(newS);
   };
 
@@ -211,7 +212,7 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
     };
 
     const filteredSessions = selectedMonth 
-      ? sessions.filter(s => s.date.startsWith(selectedMonth))
+      ? sessions.filter(s => s.date?.startsWith(selectedMonth))
       : sessions;
 
     const globalStudents = new Set<string>();
@@ -234,8 +235,8 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
       if (act.paymentType === 'monthly') {
         const hasSessions = filteredSessions.some(s => s.activityId === act.id);
         if (hasSessions || act.isRecurring) {
-          stats.activities[act.id].totalRevenue = act.pricePerClass;
-          stats.totalRevenue += act.pricePerClass;
+          stats.activities[act.id].totalRevenue = act.pricePerClass || 0;
+          stats.totalRevenue += act.pricePerClass || 0;
         }
       }
     });
@@ -258,17 +259,17 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
         let sessionRevenue = 0;
         if (activity.paymentType !== 'monthly') {
           const durationFactor = (session.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
-          sessionRevenue = activity.pricePerClass * durationFactor;
+          sessionRevenue = (activity.pricePerClass || 0) * durationFactor;
         }
         
         stats.totalHeld++;
         stats.totalBilled++;
-        stats.totalRevenue += sessionRevenue;
+        stats.totalRevenue += sessionRevenue || 0;
         
         actStats.heldCount++;
-        actStats.totalRevenue += sessionRevenue;
+        actStats.totalRevenue += sessionRevenue || 0;
         if (session.duration) {
-          actStats.totalDuration += session.duration;
+          actStats.totalDuration += session.duration || 0;
         }
       } else {
         stats.totalCancelled++;
@@ -277,14 +278,14 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean)
           let cancelRevenue = 0;
           if (activity.paymentType !== 'monthly') {
              const durationFactor = (session.duration ?? activity.defaultDuration ?? 1) / (activity.defaultDuration || 1);
-             cancelRevenue = activity.pricePerClass * durationFactor;
+             cancelRevenue = (activity.pricePerClass || 0) * durationFactor;
           }
 
           stats.totalBilled++;
-          stats.totalRevenue += cancelRevenue;
+          stats.totalRevenue += cancelRevenue || 0;
           
           actStats.cancelledBilledCount++;
-          actStats.totalRevenue += cancelRevenue;
+          actStats.totalRevenue += cancelRevenue || 0;
         } else {
           actStats.cancelledUnbilledCount++;
         }

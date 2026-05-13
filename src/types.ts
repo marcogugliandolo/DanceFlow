@@ -28,6 +28,7 @@ export interface ClassSession {
   notes?: string; 
   attendeeIds?: string[];
   duration?: number;
+  attendanceCompleted?: boolean;
 }
 
 export interface SummaryStats {

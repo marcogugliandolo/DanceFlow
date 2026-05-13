@@ -10,6 +10,7 @@ import crypto from "crypto";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import { OAuth2Client } from "google-auth-library";
+import { google } from "googleapis";
 
 dotenv.config();
 
@@ -94,7 +95,12 @@ const tryAlterTable = (sql: string) => {
   try { db.exec(sql); } catch (e) { /* ignore duplicate column errors */ }
 };
 
+tryAlterTable("ALTER TABLE users ADD COLUMN google_refresh_token TEXT;");
+tryAlterTable("ALTER TABLE users ADD COLUMN drive_file_id TEXT;");
+tryAlterTable("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';");
+tryAlterTable("ALTER TABLE users ADD COLUMN last_active DATETIME;");
 tryAlterTable("ALTER TABLE students ADD COLUMN phone TEXT;");
+
 tryAlterTable("ALTER TABLE students ADD COLUMN email TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN notes TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN location TEXT;");
@@ -103,6 +109,10 @@ tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;
 tryAlterTable("ALTER TABLE activities ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN user_id TEXT;");
+
+try {
+  db.prepare("UPDATE users SET role = 'admin' WHERE email = 'marcogugliandolo94@gmail.com'").run();
+} catch (e) {}
 
 // Migrate old data assuming it belongs to the first created user
 const firstUser = db.prepare("SELECT id FROM users ORDER BY ROWID ASC LIMIT 1").get() as any;
@@ -151,9 +161,11 @@ app.get("/api/auth/google/url", (req, res) => {
   }
   const url = client.generateAuthUrl({
     access_type: "offline",
+    prompt: "consent",
     scope: [
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/drive.file"
     ],
   });
   res.json({ url });
@@ -185,10 +197,16 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
       if (!user) {
         // Create user
+        const isFirstUser = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+        const role = isFirstUser.count === 0 ? 'admin' : 'user';
+
         const id = crypto.randomUUID();
-        db.prepare("INSERT INTO users (id, google_id, name, email, avatar_url) VALUES (?, ?, ?, ?, ?)")
-          .run(id, googleId, name, email, avatarUrl);
-        user = { id, google_id: googleId, name, email, avatar_url: avatarUrl };
+        db.prepare("INSERT INTO users (id, google_id, name, email, avatar_url, google_refresh_token, role) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(id, googleId, name, email, avatarUrl, tokens.refresh_token || null, role);
+        user = { id, google_id: googleId, name, email, avatar_url: avatarUrl, google_refresh_token: tokens.refresh_token || null, role };
+      } else if (tokens.refresh_token) {
+        db.prepare("UPDATE users SET google_refresh_token = ? WHERE id = ?").run(tokens.refresh_token, user.id);
+        user.google_refresh_token = tokens.refresh_token;
       }
 
       // Set user in session
@@ -219,16 +237,58 @@ app.get("/api/auth/google/callback", async (req, res) => {
 });
 
 app.get("/api/auth/me", (req, res) => {
-  const user = ((req as any).session as any).user || null;
-  if (!user) {
+  const sessionUser = ((req as any).session as any).user || null;
+  if (!sessionUser) {
     return res.json({ user: null });
   }
   
+  const dbUser = db.prepare("SELECT * FROM users WHERE id = ?").get(sessionUser.id) as any;
+  if (!dbUser) {
+    return res.json({ user: null });
+  }
+  
+  const finalUser = {
+    ...sessionUser,
+    role: dbUser.role || 'user'
+  };
+
   try {
-    const syncData = getSyncData(user.id);
-    res.json({ user, syncData });
+    const syncData = getSyncData(sessionUser.id);
+    res.json({ user: finalUser, syncData });
   } catch (error) {
-    res.json({ user });
+    res.json({ user: finalUser });
+  }
+});
+
+// Admin Routes
+app.get("/api/admin/users", requireAdmin, (req, res) => {
+  const users = db.prepare(`
+    SELECT users.id, users.name, users.email, users.avatar_url, users.role, users.last_active, 
+           COUNT(DISTINCT activities.id) as activitiesCount, 
+           COUNT(DISTINCT class_sessions.id) as sessionsCount,
+           COUNT(DISTINCT students.id) as studentsCount
+    FROM users 
+    LEFT JOIN activities ON users.id = activities.user_id
+    LEFT JOIN class_sessions ON users.id = class_sessions.user_id
+    LEFT JOIN students ON users.id = students.user_id
+    GROUP BY users.id
+  `).all();
+  res.json(users);
+});
+
+app.put("/api/admin/users/:id/role", requireAdmin, (req, res) => {
+  const { role } = req.body; 
+  db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, req.params.id);
+  res.json({ success: true });
+});
+
+app.get("/api/admin/users/:id/data", requireAdmin, (req, res) => {
+  try {
+    const syncData = getSyncData(req.params.id);
+    const user = db.prepare("SELECT id, name, email FROM users WHERE id = ?").get(req.params.id);
+    res.json({ user, syncData });
+  } catch(e: any) {
+    res.status(500).json({ error: "DB Error" });
   }
 });
 
@@ -263,9 +323,9 @@ app.post("/api/auth/login", (req, res) => {
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get("profesor@ejemplo.com") as any;
     if (!user) {
       const id = crypto.randomUUID();
-      db.prepare("INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)")
-        .run(id, "Profesor", "profesor@ejemplo.com", "salsanova");
-      user = { id, name: "Profesor", email: "profesor@ejemplo.com" };
+      db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
+        .run(id, "Profesor", "profesor@ejemplo.com", "salsanova", "user");
+      user = { id, name: "Profesor", email: "profesor@ejemplo.com", role: "user" };
     }
     ((req as any).session as any).user = user;
     try {
@@ -275,6 +335,25 @@ app.post("/api/auth/login", (req, res) => {
       return res.json({ success: true, user });
     }
   }
+
+  // Admin testing account
+  if (username.toLowerCase() === "admin" && password === "admin") {
+    let user = db.prepare("SELECT * FROM users WHERE email = ?").get("admin@salsanova.com") as any;
+    if (!user) {
+      const id = crypto.randomUUID();
+      db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
+        .run(id, "Super Admin", "admin@salsanova.com", "admin", "admin");
+      user = { id, name: "Super Admin", email: "admin@salsanova.com", role: "admin" };
+    }
+    ((req as any).session as any).user = user;
+    try {
+      const syncData = getSyncData(user.id);
+      return res.json({ success: true, user, syncData });
+    } catch {
+      return res.json({ success: true, user });
+    }
+  }
+
   res.status(401).json({ error: "Invalid credentials" });
 });
 
@@ -300,13 +379,27 @@ app.post("/api/profile/password", (req, res) => {
 });
 
 // Auth Middleware
-const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const user = ((req as any).session as any).user;
   if (!user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+  db.prepare("UPDATE users SET last_active = ? WHERE id = ?").run(new Date().toISOString(), user.id);
   next();
-};
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = ((req as any).session as any).user;
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const dbUser = db.prepare("SELECT role FROM users WHERE id = ?").get(user.id) as any;
+  if (!dbUser || dbUser.role !== 'admin') {
+    return res.status(403).json({ error: "Forbidden: Admins only" });
+  }
+  db.prepare("UPDATE users SET last_active = ? WHERE id = ?").run(new Date().toISOString(), user.id);
+  next();
+}
 
 app.get("/api/export", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
@@ -714,6 +807,66 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Periodic Google Drive Backup
+  setInterval(async () => {
+    console.log("Running scheduled Google Drive backups...");
+    const usersWithRefresh = db.prepare("SELECT * FROM users WHERE google_refresh_token IS NOT NULL").all() as any[];
+    
+    for (const user of usersWithRefresh) {
+      try {
+        const syncData = getSyncData(user.id);
+        const jsonContent = JSON.stringify(syncData, null, 2);
+        
+        const client = new OAuth2Client(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        client.setCredentials({ refresh_token: user.google_refresh_token });
+        
+        const drive = google.drive({ version: 'v3', auth: client as any });
+        
+        const fileMetadata = {
+          name: 'SalsaNova_Backup.json',
+          mimeType: 'application/json'
+        };
+        const media = {
+          mimeType: 'application/json',
+          body: jsonContent
+        };
+        
+        if (user.drive_file_id) {
+          try {
+            await drive.files.update({
+              fileId: user.drive_file_id,
+              media: media
+            });
+            console.log(`Backup updated for user ${user.email}`);
+            continue;
+          } catch (updateErr: any) {
+            if (updateErr.status === 404 || updateErr.code === 404) {
+               // File deleted or lost, recreate it below
+            } else {
+               throw updateErr;
+            }
+          }
+        }
+        
+        const response = await drive.files.create({
+          requestBody: fileMetadata,
+          media: media,
+          fields: 'id'
+        });
+        
+        if (response.data.id) {
+          db.prepare("UPDATE users SET drive_file_id = ? WHERE id = ?").run(response.data.id, user.id);
+          console.log(`Backup created for user ${user.email} with File ID ${response.data.id}`);
+        }
+      } catch (e: any) {
+        console.error(`Failed to backup for user ${user.email}:`, e.message);
+      }
+    }
+  }, 2 * 60 * 60 * 1000);
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
