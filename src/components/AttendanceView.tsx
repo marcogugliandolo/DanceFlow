@@ -37,12 +37,15 @@ const StudentTableCard = ({
           <div className="min-w-0 pr-2">
             <h4 className="font-bold text-zinc-900 dark:text-white text-lg leading-tight truncate">{student.name}</h4>
             <span className="text-[11px] font-semibold text-zinc-400 mt-1 block tracking-wide uppercase">
-              {attendedCount} / {totalCount} clases
+              Asistencia
             </span>
           </div>
         </div>
         <div className="flex flex-col items-end shrink-0">
-          <span className="text-2xl font-black text-emerald-500 leading-none">{attendancePercentage}%</span>
+          <div className="flex items-baseline gap-1 text-emerald-500">
+            <span className="text-2xl font-black leading-none">{attendedCount}</span>
+            <span className="text-xs font-bold opacity-60">/ {totalCount}</span>
+          </div>
           <div className="w-16 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${attendancePercentage}%` }} />
           </div>
