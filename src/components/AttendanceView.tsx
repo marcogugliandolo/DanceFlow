@@ -6,6 +6,89 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { safeFormat, isValidDateStr } from "../lib/dateUtils";
 
+const StudentTableCard = ({
+  student,
+  tableSessions,
+  activities,
+  selectedActivityId,
+  toggleAttendanceTable
+}: {
+  student: Student;
+  tableSessions: ClassSession[];
+  activities: Activity[];
+  selectedActivityId: string;
+  toggleAttendanceTable: (sessionId: string, studentId: string) => void;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const attendedCount = tableSessions.filter(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id)).length;
+  const totalCount = tableSessions.length;
+  const attendancePercentage = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0;
+  
+  const displaySessions = isExpanded ? tableSessions : tableSessions.slice(0, 5);
+  const hasMore = tableSessions.length > 5;
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 group">
+      <div className="flex justify-between items-start mb-5 pb-5 border-b border-zinc-100 dark:border-zinc-800/80">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center font-black text-lg text-zinc-400 shrink-0 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 group-hover:text-emerald-500 transition-colors">
+            {student.name.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 pr-2">
+            <h4 className="font-bold text-zinc-900 dark:text-white text-lg leading-tight truncate">{student.name}</h4>
+            <span className="text-[11px] font-semibold text-zinc-400 mt-1 block tracking-wide uppercase">
+              {attendedCount} / {totalCount} clases
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end shrink-0">
+          <span className="text-2xl font-black text-emerald-500 leading-none">{attendancePercentage}%</span>
+          <div className="w-16 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${attendancePercentage}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <div className="flex flex-wrap gap-2.5">
+          {displaySessions.map((session, index) => {
+            const isPresent = Array.isArray(session.attendeeIds) && session.attendeeIds.includes(student.id);
+            const activityName = selectedActivityId === "all" ? activities.find(a => a.id === session.activityId)?.name || 'Clase' : '';
+            const dateStr = safeFormat(session.date, "dd/MM");
+            
+            return (
+              <motion.button
+                initial={isExpanded && index >= 5 ? { opacity: 0, y: -10 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                key={session.id}
+                onClick={() => toggleAttendanceTable(session.id, student.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all shadow-sm active:scale-95 ${
+                  isPresent
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-200/50 dark:ring-emerald-800/50"
+                    : "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/30 dark:text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400 ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
+                }`}
+              >
+                {isPresent ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3 h-3 opacity-60" />}
+                <span>{dateStr}</span>
+                {activityName && <span className="opacity-60 max-w-[80px] truncate ml-0.5 font-medium">{activityName}</span>}
+              </motion.button>
+            );
+          })}
+        </div>
+        
+        {hasMore && (
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="mt-4 mt-auto text-[11px] font-bold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center py-2.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl transition-colors w-full"
+          >
+            {isExpanded ? "Ocultar historial" : `Ver ${tableSessions.length - 5} clases más`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const AttendanceView = ({
   activities,
   sessions,
@@ -380,61 +463,16 @@ export const AttendanceView = ({
                   <p className="text-center font-medium">No se encontraron alumnos.</p>
                 </div>
               )}
-              {filteredStudents.map(student => {
-                const attendedCount = tableSessions.filter(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id)).length;
-                const totalCount = tableSessions.length;
-                const attendancePercentage = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0;
-                
-                return (
-                  <div key={student.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 group">
-                    <div className="flex justify-between items-start mb-5 pb-5 border-b border-zinc-100 dark:border-zinc-800/80">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center font-black text-lg text-zinc-400 shrink-0 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 group-hover:text-emerald-500 transition-colors">
-                          {student.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 pr-2">
-                          <h4 className="font-bold text-zinc-900 dark:text-white text-lg leading-tight truncate">{student.name}</h4>
-                          <span className="text-[11px] font-semibold text-zinc-400 mt-1 block tracking-wide uppercase">
-                            {attendedCount} / {totalCount} clases
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0">
-                        <span className="text-2xl font-black text-emerald-500 leading-none">{attendancePercentage}%</span>
-                        <div className="w-16 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${attendancePercentage}%` }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex flex-wrap gap-2.5">
-                        {tableSessions.map(session => {
-                          const isPresent = Array.isArray(session.attendeeIds) && session.attendeeIds.includes(student.id);
-                          const activityName = selectedActivityId === "all" ? activities.find(a => a.id === session.activityId)?.name || 'Clase' : '';
-                          const dateStr = safeFormat(session.date, "dd/MM");
-                          
-                          return (
-                            <button
-                              key={session.id}
-                              onClick={() => toggleAttendanceTable(session.id, student.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all shadow-sm active:scale-95 ${
-                                isPresent
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-200/50 dark:ring-emerald-800/50"
-                                  : "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/30 dark:text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400 ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
-                              }`}
-                            >
-                              {isPresent ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3 h-3 opacity-60" />}
-                              <span>{dateStr}</span>
-                              {activityName && <span className="opacity-60 max-w-[80px] truncate ml-0.5 font-medium">{activityName}</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredStudents.map(student => (
+                <StudentTableCard 
+                  key={student.id}
+                  student={student}
+                  tableSessions={tableSessions}
+                  activities={activities}
+                  selectedActivityId={selectedActivityId}
+                  toggleAttendanceTable={toggleAttendanceTable}
+                />
+              ))}
             </div>
           )}
         </div>
