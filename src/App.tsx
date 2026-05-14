@@ -502,6 +502,7 @@ import {
   Grid,
   Check,
   Shield,
+  Users,
 } from "lucide-react";
 
 const cardVariants = {
@@ -612,8 +613,8 @@ const AdminPanel = ({ profile }: { profile: any }) => {
                     <div className="font-bold">{act?.name || 'Desconocida'}</div>
                     <div className="text-sm text-zinc-500">{s.date} - Duración: {s.duration || 1}h</div>
                   </div>
-                  <div className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${s.status === 'held' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                    {s.status === 'held' ? 'Realizada' : 'Cancelada'}
+                  <div className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${s.status === 'held' ? 'bg-emerald-100 text-emerald-600' : s.status === 'substitution' ? 'bg-cyan-100 text-cyan-600' : 'bg-red-100 text-red-600'}`}>
+                    {s.status === 'held' ? 'Realizada' : s.status === 'substitution' ? 'Sustitución' : 'Cancelada'}
                   </div>
                 </div>
               );
@@ -848,6 +849,19 @@ export default function App() {
   const [sessionJustification, setSessionJustification] = useState("");
   const [sessionNotes, setSessionNotes] = useState("");
   const [sessionAttendeeIds, setSessionAttendeeIds] = useState<string[]>([]);
+  const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch('/api/teachers')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setTeachers(data);
+      })
+      .catch(console.error);
+  }, [isAuthenticated]);
+
+  const [sessionSubstituteTeacherId, setSessionSubstituteTeacherId] = useState("");
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editSessionActId, setEditSessionActId] = useState("");
@@ -857,6 +871,7 @@ export default function App() {
     useState<ClassStatus>("held");
   const [editSessionJustification, setEditSessionJustification] = useState("");
   const [editSessionNotes, setEditSessionNotes] = useState("");
+  const [editSessionSubstituteTeacherId, setEditSessionSubstituteTeacherId] = useState("");
   const [editSessionAttendeeIds, setEditSessionAttendeeIds] = useState<
     string[]
   >([]);
@@ -1028,7 +1043,8 @@ export default function App() {
           : undefined,
       notes: sessionNotes || undefined,
       attendeeIds:
-        sessionStatus === "held" ? sessionAttendeeIds : [],
+        (sessionStatus === "held" || sessionStatus === "substitution") ? sessionAttendeeIds : [],
+      substituteTeacherId: sessionStatus === "substitution" ? sessionSubstituteTeacherId : undefined,
     });
     setSessionActId("");
     setSessionDate("");
@@ -1037,6 +1053,7 @@ export default function App() {
     setSessionJustification("");
     setSessionNotes("");
     setSessionAttendeeIds([]);
+    setSessionSubstituteTeacherId("");
   };
 
   const handleEditSessionSubmit = (e: React.FormEvent) => {
@@ -1054,9 +1071,10 @@ export default function App() {
           : undefined,
       notes: editSessionNotes || undefined,
       attendeeIds:
-        editSessionStatus === "held"
+        (editSessionStatus === "held" || editSessionStatus === "substitution")
           ? editSessionAttendeeIds
           : [],
+      substituteTeacherId: editSessionStatus === "substitution" ? editSessionSubstituteTeacherId : undefined,
     });
     setEditingSessionId(null);
   };
@@ -1167,6 +1185,7 @@ export default function App() {
           held: number;
           cancelled_billed: number;
           cancelled_unbilled: number;
+          substitution: number;
         };
       }
     >();
@@ -1189,7 +1208,7 @@ export default function App() {
           sessions: [],
           totalAmount: 0,
           totalHours: 0,
-          statusCounts: { held: 0, cancelled_billed: 0, cancelled_unbilled: 0 },
+          statusCounts: { held: 0, cancelled_billed: 0, cancelled_unbilled: 0, substitution: 0 },
         });
       }
 
@@ -1199,6 +1218,7 @@ export default function App() {
       group.totalHours += s.duration || 1;
 
       if (s.status === "held") group.statusCounts.held++;
+      else if (s.status === "substitution") group.statusCounts.substitution++;
       else if (s.status === "cancelled_billed")
         group.statusCounts.cancelled_billed++;
       else if (s.status === "cancelled_unbilled")
@@ -1237,6 +1257,7 @@ export default function App() {
       const statusLines = sessions
         .map((s) => {
           if (s.status === "held") return "Realizada";
+          if (s.status === "substitution") return "Sustit.";
           if (s.status === "cancelled_billed") return "Can. (Cobra)";
           return "Can. (No Cobra)";
         })
@@ -2520,12 +2541,23 @@ export default function App() {
                           (No cobra)
                         </span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setSessionStatus("substitution")}
+                        className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${
+                          sessionStatus === "substitution"
+                            ? "bg-white dark:bg-zinc-700 shadow-sm text-cyan-600 dark:text-cyan-400"
+                            : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        }`}
+                      >
+                        <span className="block">Sustitución</span>
+                      </button>
                     </div>
 
                     <AnimatePresence mode="wait">
-                      {sessionStatus === "held" && (
+                      {(sessionStatus === "held" || sessionStatus === "substitution") && (
                         <motion.div
-                          key="held"
+                          key="held-or-subst"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
@@ -2533,7 +2565,25 @@ export default function App() {
                           className="overflow-hidden px-1 -mx-1"
                         >
                           <div className="pt-1 pb-1">
-                            <label className="block mt-1 text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">
+                            {sessionStatus === "substitution" && (
+                              <>
+                                <label className="block mt-1 text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2">
+                                  Profesor Sustituto
+                                </label>
+                                <select
+                                  value={sessionSubstituteTeacherId}
+                                  onChange={(e) => setSessionSubstituteTeacherId(e.target.value)}
+                                  required
+                                  className="w-full mb-4 h-[52px] sm:h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 rounded-2xl text-base sm:text-sm font-semibold outline-none focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm appearance-none"
+                                >
+                                  <option value="">Selecciona profesor sustituto...</option>
+                                  {teachers.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </>
+                            )}
+                            <label className={`block ${sessionStatus === "substitution" ? "mt-4" : "mt-1"} text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1 mb-2`}>
                               Asistentes
                             </label>
                             <button
@@ -2561,7 +2611,7 @@ export default function App() {
                           </div>
                         </motion.div>
                       )}
-                      {sessionStatus !== "held" && (
+                      {(sessionStatus === "cancelled_billed" || sessionStatus === "cancelled_unbilled") && (
                         <motion.div
                           key="other"
                           initial={{ height: 0, opacity: 0 }}
@@ -3033,10 +3083,29 @@ export default function App() {
                                         (No cobra)
                                       </span>
                                     </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditSessionStatus("substitution")}
+                                      className={`flex-1 py-1 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-xl transition-all flex flex-col items-center justify-center min-h-[48px] leading-tight text-center ${editSessionStatus === "substitution" ? "bg-white dark:bg-zinc-700 shadow-sm text-cyan-600 dark:text-cyan-400" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
+                                    >
+                                      <span className="block">Sustitución</span>
+                                    </button>
                                   </div>
-                                  {editSessionStatus ===
-                                  "held" ? (
+                                  {(editSessionStatus === "held" || editSessionStatus === "substitution") ? (
                                     <div className="flex flex-col gap-2">
+                                      {editSessionStatus === "substitution" && (
+                                        <select
+                                          value={editSessionSubstituteTeacherId}
+                                          onChange={(e) => setEditSessionSubstituteTeacherId(e.target.value)}
+                                          required
+                                          className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all text-zinc-900 dark:text-zinc-100 appearance-none"
+                                        >
+                                          <option value="">Profesor sustituto...</option>
+                                          {teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -3060,21 +3129,6 @@ export default function App() {
                                         }
                                         className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
                                       />
-                                      {editSessionStatus ===
-                                        "cancelled_billed" && (
-                                        <input
-                                          type="text"
-                                          required
-                                          placeholder="Motivo"
-                                          value={editSessionJustification}
-                                          onChange={(e) =>
-                                            setEditSessionJustification(
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="w-full bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-2 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
-                                        />
-                                      )}
                                     </div>
                                   ) : (
                                     <input
@@ -3181,6 +3235,11 @@ export default function App() {
                                       {session.status === "held" && (
                                         <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
                                           Realizadas
+                                        </span>
+                                      )}
+                                      {session.status === "substitution" && (
+                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400">
+                                          Sustitución
                                         </span>
                                       )}
                                       {session.status ===
@@ -3941,6 +4000,7 @@ export default function App() {
                                       (a) => a.id === session.activityId,
                                     );
                                     const isHeld = session.status === "held";
+                                    const isSubst = session.status === "substitution";
                                     const hasValidDate = isValidDateStr(session.date);
 
                                     return (
@@ -3972,7 +4032,9 @@ export default function App() {
                                           <p className="text-xs font-semibold text-zinc-500 truncate mt-0.5">
                                             {isHeld
                                               ? "Realizada"
-                                              : "No asistió"}
+                                              : isSubst 
+                                                ? "Sustitución" 
+                                                : "No asistió"}
                                             {session.duration
                                               ? ` • ${session.duration} hora${session.duration !== 1 ? "s" : ""}`
                                               : " • 1 hora"}
@@ -3984,6 +4046,10 @@ export default function App() {
                                           {isHeld ? (
                                             <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                                               <CheckCircle2 className="w-4 h-4" />
+                                            </div>
+                                          ) : isSubst ? (
+                                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                                              <Users className="w-4 h-4" />
                                             </div>
                                           ) : (
                                             <div className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">

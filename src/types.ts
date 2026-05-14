@@ -1,4 +1,4 @@
-export type ClassStatus = 'held' | 'cancelled_billed' | 'cancelled_unbilled';
+export type ClassStatus = 'held' | 'cancelled_billed' | 'cancelled_unbilled' | 'substitution';
 
 export interface Activity {
   id: string;
@@ -29,6 +29,7 @@ export interface ClassSession {
   attendeeIds?: string[];
   duration?: number;
   attendanceCompleted?: boolean;
+  substituteTeacherId?: string; // Add substituteTeacherId
 }
 
 export interface SummaryStats {

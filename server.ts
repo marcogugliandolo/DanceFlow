@@ -40,7 +40,7 @@ function getSyncData(userId: string) {
           parsed = JSON.parse(s.attendeeIds);
         } catch (e) {}
       }
-      return { ...s, attendeeIds: parsed };
+      return { ...s, attendeeIds: parsed, substituteTeacherId: s.substitute_teacher_id, substitute_teacher_id: undefined };
     }),
     students
   };
@@ -108,6 +108,7 @@ tryAlterTable("ALTER TABLE class_sessions ADD COLUMN duration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN user_id TEXT;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN substitute_teacher_id TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN user_id TEXT;");
 
 try {
@@ -420,7 +421,9 @@ app.get("/api/export", requireAuth, (req, res) => {
         }
         return {
           ...s,
-          attendeeIds: parsed
+          attendeeIds: parsed,
+          substituteTeacherId: s.substitute_teacher_id,
+          substitute_teacher_id: undefined
         };
       }),
       students,
@@ -567,7 +570,9 @@ app.get("/api/sessions", requireAuth, (req, res) => {
     }
     return {
       ...s,
-      attendeeIds: parsed
+      attendeeIds: parsed,
+      substituteTeacherId: s.substitute_teacher_id,
+      substitute_teacher_id: undefined
     };
   }));
 });
@@ -576,11 +581,11 @@ app.get("/api/sessions", requireAuth, (req, res) => {
 app.post("/api/sessions", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const sessions = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+      insert.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
     }
   })();
   res.json({ success: true });
@@ -590,8 +595,32 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const s = req.body;
   try {
-    db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1);
+    db.transaction(() => {
+      db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
+
+      if (s.status === 'substitution' && s.substituteTeacherId) {
+        const subSessionId = `sub_${s.id}`;
+        
+        // Ensure an activity exists for the substitute teacher
+        const originActivity = db.prepare("SELECT * FROM activities WHERE id = ?").get(s.activityId) as any;
+        if (originActivity) {
+          const subActId = `sub_${s.activityId}_${s.substituteTeacherId}`;
+          const existingAct = db.prepare("SELECT id FROM activities WHERE id = ?").get(subActId);
+          if (!existingAct) {
+            db.prepare("INSERT INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .run(subActId, s.substituteTeacherId, originActivity.name + ' (Sustitución)', originActivity.location || '', originActivity.pricePerClass || 0, originActivity.paymentType || 'Mensual', 0, originActivity.defaultDuration || 1);
+          }
+          
+          db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(subSessionId, s.substituteTeacherId, subActId, s.date || new Date().toISOString().split('T')[0], 'held', null, `Sustituyendo a ${user.name}`, '[]', s.duration ?? 1, null);
+        }
+      } else {
+        // If it was reverted from substitution
+        const subSessionId = `sub_${s.id}`;
+        db.prepare("DELETE FROM class_sessions WHERE id = ?").run(subSessionId);
+      }
+    })();
     res.json({ success: true });
   } catch (err: any) {
     console.error("POST session error:", err);
@@ -696,6 +725,12 @@ app.post("/api/external/clase", express.json(), (req, res) => {
     console.error("Error en API Externa:", error);
     res.status(500).json({ error: "Error interno del servidor al registrar la clase externa" });
   }
+});
+
+// Get all teachers
+app.get("/api/teachers", requireAuth, (req, res) => {
+  const teachers = db.prepare("SELECT id, name, avatar_url FROM users").all();
+  res.json(teachers);
 });
 
 // Get all students
