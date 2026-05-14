@@ -401,6 +401,13 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
     return res.status(401).json({ error: "Unauthorized" });
   }
   db.prepare("UPDATE users SET last_active = ? WHERE id = ?").run(new Date().toISOString(), user.id);
+  
+  // Set effectiveUserId for admin proxy
+  (req as any).effectiveUserId = user.id;
+  if (user.role === 'admin' && req.query.admin_user_id) {
+    (req as any).effectiveUserId = req.query.admin_user_id;
+  }
+  
   next();
 }
 
@@ -528,7 +535,7 @@ app.use("/api", (req, res, next) => {
 // Get all activities
 app.get("/api/activities", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
-  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(user.id);
+  const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all((req as any).effectiveUserId);
   res.json(activities.map((a: any) => ({...a, isRecurring: Boolean(a.isRecurring)})));
 });
 
@@ -540,7 +547,7 @@ app.post("/api/activities", requireAuth, (req, res) => {
   
   db.transaction(() => {
     for (const a of activities) {
-      insert.run(a.id, user.id, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+      insert.run(a.id, (req as any).effectiveUserId, a.name || 'Actividad sin nombre', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
     }
   })();
   res.json({ success: true });
@@ -551,15 +558,15 @@ app.post("/api/activities/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const a = req.body;
   db.prepare("INSERT OR REPLACE INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(a.id, user.id, a.name || 'Actividad', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
+    .run(a.id, (req as any).effectiveUserId, a.name || 'Actividad', a.location || 'Sin ubicación', a.pricePerClass || 0, a.paymentType || null, a.isRecurring ? 1 : 0, a.defaultDuration ?? 1);
   res.json({ success: true });
 });
 
 app.delete("/api/activities/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   try {
-    const r1 = db.prepare("DELETE FROM class_sessions WHERE activityId = ? AND user_id = ?").run(req.params.id, user.id);
-    const r2 = db.prepare("DELETE FROM activities WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const r1 = db.prepare("DELETE FROM class_sessions WHERE activityId = ? AND user_id = ?").run(req.params.id, (req as any).effectiveUserId);
+    const r2 = db.prepare("DELETE FROM activities WHERE id = ? AND user_id = ?").run(req.params.id, (req as any).effectiveUserId);
     res.json({ success: true });
   } catch (err) {
     console.error("DELETE activities error:", err);
@@ -570,7 +577,7 @@ app.delete("/api/activities/:id", requireAuth, (req, res) => {
 // Get all sessions
 app.get("/api/sessions", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
-  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
+  const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all((req as any).effectiveUserId);
   // Ensure attendeeIds is returned as an array or empty array if null
   res.json(sessions.map((s: any) => {
     let parsed = [];
@@ -600,7 +607,7 @@ app.post("/api/sessions", requireAuth, (req, res) => {
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
+      insert.run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
     }
   })();
   res.json({ success: true });
@@ -612,7 +619,7 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
   try {
     db.transaction(() => {
       db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(s.id, user.id, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
+        .run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
 
       if (s.status === 'substitution' && s.substituteTeacherId) {
         const subSessionId = `sub_${s.id}`;
@@ -646,7 +653,7 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
 app.delete("/api/sessions/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   try {
-    const result = db.prepare("DELETE FROM class_sessions WHERE id = ? AND user_id = ?").run(req.params.id, user.id);
+    const result = db.prepare("DELETE FROM class_sessions WHERE id = ? AND user_id = ?").run(req.params.id, (req as any).effectiveUserId);
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE session error:", err);
@@ -751,7 +758,7 @@ app.get("/api/teachers", requireAuth, (req, res) => {
 // Get all students
 app.get("/api/students", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
-  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all(user.id);
+  const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all((req as any).effectiveUserId);
   res.json(students);
 });
 
@@ -764,7 +771,7 @@ app.post("/api/students", requireAuth, (req, res) => {
   try {
     db.transaction(() => {
       for (const s of students) {
-        insert.run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
+        insert.run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
       }
     })();
     res.json({ success: true });
@@ -780,7 +787,7 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
   const s = req.body;
   try {
     db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(s.id, user.id, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
+      .run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
     res.json({ success: true, student: s });
   } catch (err: any) {
     console.error("POST student error:", err);
@@ -791,13 +798,13 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
 app.delete("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const studentId = req.params.id;
-  console.log("==> DELETING STUDENT:", studentId, "USER:", user.id);
+  console.log("==> DELETING STUDENT:", studentId, "USER:", (req as any).effectiveUserId);
   try {
     db.transaction(() => {
       console.log("==> Inside transaction!");
-      db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(studentId, user.id);
+      db.prepare("DELETE FROM students WHERE id = ? AND user_id = ?").run(studentId, (req as any).effectiveUserId);
       
-      const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all(user.id);
+      const sessions = db.prepare("SELECT * FROM class_sessions WHERE user_id = ?").all((req as any).effectiveUserId);
       const updateSession = db.prepare("UPDATE class_sessions SET attendeeIds = ? WHERE id = ? AND user_id = ?");
       
       let updatedCount = 0;
@@ -807,7 +814,7 @@ app.delete("/api/students/:id", requireAuth, (req, res) => {
             const parsed = JSON.parse(s.attendeeIds);
             if (Array.isArray(parsed) && parsed.includes(studentId)) {
               const nextIds = parsed.filter(id => id !== studentId);
-              updateSession.run(JSON.stringify(nextIds), s.id, user.id);
+              updateSession.run(JSON.stringify(nextIds), s.id, (req as any).effectiveUserId);
               updatedCount++;
             }
           } catch (e) {
@@ -825,11 +832,9 @@ app.delete("/api/students/:id", requireAuth, (req, res) => {
 });
 
 // Fast Sync Data Route
-app.get("/api/sync", requireAuth, (req, res) => {
-  const user = ((req as any).session as any).user;
-  
+app.get("/api/sync", requireAuth, (req, res) => {  
   try {
-    const syncData = getSyncData(user.id);
+    const syncData = getSyncData((req as any).effectiveUserId);
     res.json(syncData);
   } catch (error) {
     res.status(500).json({ error: "Sync failed" });

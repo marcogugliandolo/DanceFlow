@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoBase64 from "./logo";
-import { useDanceStore } from "./hooks/useDanceStore";
+import { useDanceStore, computeSummary } from "./hooks/useDanceStore";
 import { isValidDateStr, safeFormat } from "./lib/dateUtils";
 import { ClassStatus, Student } from "./types";
 import { motion, AnimatePresence } from "motion/react";
@@ -522,7 +522,7 @@ const containerVariants = {
   },
 };
 
-const AdminPanel = ({ profile }: { profile: any }) => {
+const AdminPanel = ({ profile, setAdminUserId, setAdminUserName }: { profile: any, setAdminUserId: (id: string | null) => void, setAdminUserName: (name: string | null) => void }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -598,6 +598,17 @@ const AdminPanel = ({ profile }: { profile: any }) => {
           </h2>
           <p className="text-zinc-500 text-sm mb-6">{selectedUser.email}</p>
 
+          <div className="flex gap-4 mb-6">
+            <button
+               onClick={() => {
+                 setAdminUserId(selectedUser.id);
+                 setAdminUserName(selectedUser.name);
+               }}
+               className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white font-bold rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+            >
+               Gestionar perfil completo
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
               <div className="text-3xl font-black text-rose-500">{userData.activities?.length || 0}</div>
@@ -721,6 +732,8 @@ const AdminPanel = ({ profile }: { profile: any }) => {
 };
 
 export default function App() {
+  const [adminUserId, setAdminUserId] = useState<string | null>(null);
+  const [adminUserName, setAdminUserName] = useState<string | null>(null);
   const [profile, setProfile] = useState<{
     name: string;
     email: string;
@@ -1834,9 +1847,20 @@ export default function App() {
 
       {/* Main Content */}
       <main className="pt-32 lg:pt-28 pb-12 px-4 max-w-6xl mx-auto">
+        {adminUserId && (
+          <div className="bg-rose-500 text-white rounded-2xl p-4 mb-6 flex justify-between items-center shadow-lg">
+            <div>
+              <span className="font-black text-lg">Modo de Gestión</span>
+              <p className="text-sm opacity-90">Estás viendo y editando como: <strong>{adminUserName}</strong></p>
+            </div>
+            <button onClick={() => { setAdminUserId(null); setAdminUserName(null); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-bold transition-colors">
+              Salir
+            </button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {activeTab === "dashboard" ? (
-            profile.role === "admin" ? (
+            profile.role === "admin" && !adminUserId ? (
               <motion.div
                 key="admin-dashboard"
                 initial={{ opacity: 0, y: 15 }}
@@ -1844,7 +1868,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.15 }}
               >
-                <AdminPanel profile={profile} />
+                <AdminPanel profile={profile} setAdminUserId={setAdminUserId} setAdminUserName={setAdminUserName} />
               </motion.div>
             ) : (
             <motion.div
