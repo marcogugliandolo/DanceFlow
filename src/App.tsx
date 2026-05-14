@@ -574,6 +574,16 @@ const AdminPanel = ({ profile }: { profile: any }) => {
     }
   };
 
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm("¿Seguro que quieres eliminar este usuario y todos sus datos? Esta acción es irreversible.")) return;
+    try {
+      await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+      fetchUsers();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-zinc-500">Cargando panel de administración...</div>;
 
   if (selectedUser && userData) {
@@ -694,6 +704,11 @@ const AdminPanel = ({ profile }: { profile: any }) => {
                     <button onClick={() => handleViewDetails(u.id)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold text-xs rounded-xl active:scale-95 transition-all">
                       Ver Clases
                     </button>
+                    {profile.id !== u.id && (
+                      <button onClick={() => handleDeleteUser(u.id)} className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl active:scale-95 transition-all ml-2">
+                        Eliminar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1693,7 +1708,7 @@ export default function App() {
 
           {/* Menú de pestañas - Desktop */}
           <div className="hidden lg:flex w-auto items-center p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 backdrop-blur-md overflow-hidden">
-            {([...(["dashboard", "asistencia", "historial", "alumnos", "perfil"]), ...(profile.role === 'admin' ? ['admin'] : [])]).map((tab) => (
+            {["dashboard", "asistencia", "historial", "alumnos", "perfil"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1773,7 +1788,7 @@ export default function App() {
               className="lg:hidden mt-2 mx-auto max-w-6xl"
             >
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-700/50 rounded-3xl p-2 shadow-xl flex flex-col gap-1 mx-2">
-                {([...(["dashboard", "asistencia", "historial", "alumnos", "perfil"]), ...(profile.role === 'admin' ? ['admin'] : [])]).map((tab) => (
+                {["dashboard", "asistencia", "historial", "alumnos", "perfil"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => {
@@ -1821,6 +1836,17 @@ export default function App() {
       <main className="pt-32 lg:pt-28 pb-12 px-4 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
           {activeTab === "dashboard" ? (
+            profile.role === "admin" ? (
+              <motion.div
+                key="admin-dashboard"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.15 }}
+              >
+                <AdminPanel profile={profile} />
+              </motion.div>
+            ) : (
             <motion.div
               key="dashboard"
               initial={{ opacity: 0, y: 15 }}
@@ -2650,6 +2676,7 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+            )
           ) : activeTab === "asistencia" ? (
             <motion.div
               key="asistencia"
@@ -3567,16 +3594,6 @@ export default function App() {
                 profile={profile}
                 setProfile={setProfile}
               />
-            </motion.div>
-          ) : activeTab === "admin" && profile.role === "admin" ? (
-            <motion.div
-              key="admin"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.15 }}
-            >
-              <AdminPanel profile={profile} />
             </motion.div>
           ) : null}
         </AnimatePresence>

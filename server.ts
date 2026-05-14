@@ -293,6 +293,21 @@ app.get("/api/admin/users/:id/data", requireAdmin, (req, res) => {
   }
 });
 
+app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
+  try {
+    db.transaction(() => {
+      db.prepare("DELETE FROM activities WHERE user_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM class_sessions WHERE user_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM students WHERE user_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM class_sessions WHERE substitute_teacher_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+    })();
+    res.json({ success: true });
+  } catch(e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/auth/logout", (req, res) => {
   (req as any).session.destroy(() => {
     res.json({ success: true });
@@ -338,12 +353,12 @@ app.post("/api/auth/login", (req, res) => {
   }
 
   // Admin testing account
-  if (username.toLowerCase() === "admin" && password === "admin") {
+  if (username.toLowerCase() === "admin" && password === "superman94") {
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get("admin@salsanova.com") as any;
     if (!user) {
       const id = crypto.randomUUID();
       db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
-        .run(id, "Super Admin", "admin@salsanova.com", "admin", "admin");
+        .run(id, "Super Admin", "admin@salsanova.com", "superman94", "admin");
       user = { id, name: "Super Admin", email: "admin@salsanova.com", role: "admin" };
     }
     ((req as any).session as any).user = user;
