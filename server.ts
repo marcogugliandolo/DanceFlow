@@ -353,12 +353,12 @@ app.post("/api/auth/login", (req, res) => {
   }
 
   // Admin testing account
-  if (username.toLowerCase() === "admin" && password === "superman94") {
+  if (username.toLowerCase() === "admin" && password === "salsanova") {
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get("admin@salsanova.com") as any;
     if (!user) {
       const id = crypto.randomUUID();
       db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
-        .run(id, "Super Admin", "admin@salsanova.com", "superman94", "admin");
+        .run(id, "Super Admin", "admin@salsanova.com", "salsanova", "admin");
       user = { id, name: "Super Admin", email: "admin@salsanova.com", role: "admin" };
     }
     ((req as any).session as any).user = user;
