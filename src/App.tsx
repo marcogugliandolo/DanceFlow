@@ -845,7 +845,9 @@ export default function App() {
     addStudent,
     editStudent,
     deleteStudent,
-  } = useDanceStore(dashboardMonth, isAuthenticated || false);
+  } = useDanceStore(dashboardMonth, isAuthenticated || false, adminUserId);
+
+  const activeProfile = adminUserId && adminUserProfile ? adminUserProfile : profile;
 
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "historial" | "alumnos" | "perfil"
