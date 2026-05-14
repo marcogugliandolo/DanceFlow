@@ -124,16 +124,16 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean,
   });
 
   useEffect(() => {
-    localStorage.setItem('dance_activities', JSON.stringify(activities));
-  }, [activities]);
+    if (!adminUserId) localStorage.setItem('dance_activities', JSON.stringify(activities));
+  }, [activities, adminUserId]);
 
   useEffect(() => {
-    localStorage.setItem('dance_sessions', JSON.stringify(sessions));
-  }, [sessions]);
+    if (!adminUserId) localStorage.setItem('dance_sessions', JSON.stringify(sessions));
+  }, [sessions, adminUserId]);
 
   useEffect(() => {
-    localStorage.setItem('dance_students', JSON.stringify(students));
-  }, [students]);
+    if (!adminUserId) localStorage.setItem('dance_students', JSON.stringify(students));
+  }, [students, adminUserId]);
 
   const lastLocalUpdate = useRef<number>(0);
 
@@ -142,15 +142,13 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean,
     if (!isAuthenticated) return;
     
     // Safety check so we don't bleed admin local state to other user views
-    if (adminUserId) {
-      setActivities([]);
-      setSessions([]);
-      setStudents([]);
-    }
+    setActivities([]);
+    setSessions([]);
+    setStudents([]);
     
-    const fetchData = async () => {
+    const fetchData = async (force = false) => {
       // Don't poll if we just updated locally in the last 3 seconds
-      if (Date.now() - lastLocalUpdate.current < 3000) {
+      if (!force && Date.now() - lastLocalUpdate.current < 3000) {
         return;
       }
 
@@ -208,7 +206,7 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean,
     };
     
     // Initial fetch
-    fetchData();
+    fetchData(true);
     
         // Poll the server every 5 seconds to get updates from Telegram bot
     const intervalId = setInterval(fetchData, 5000);

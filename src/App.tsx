@@ -78,7 +78,7 @@ const ProfileView = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/profile', {
+      const res = await fetch(`/api/profile${adminUserId ? '?admin_user_id=' + adminUserId : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -603,6 +603,12 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName }: { profile: an
                onClick={() => {
                  setAdminUserId(selectedUser.id);
                  setAdminUserName(selectedUser.name);
+                 setAdminUserProfile({
+                   name: selectedUser.name,
+                   email: selectedUser.email,
+                   avatarUrl: selectedUser.avatar_url,
+                   role: selectedUser.role
+                 });
                }}
                className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white font-bold rounded-xl hover:opacity-90 transition-opacity shadow-sm"
             >
@@ -734,6 +740,7 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName }: { profile: an
 export default function App() {
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [adminUserName, setAdminUserName] = useState<string | null>(null);
+  const [adminUserProfile, setAdminUserProfile] = useState<any | null>(null);
   const [profile, setProfile] = useState<{
     name: string;
     email: string;
@@ -1753,9 +1760,9 @@ export default function App() {
                     <Shield className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
                   ) : tab === "asistencia" ? (
                     <CheckCircle2 className="w-4 h-4 text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300" />
-                  ) : profile.avatarUrl ? (
+                  ) : activeProfile.avatarUrl ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={activeProfile.avatarUrl}
                       alt="Avatar"
                       className="w-5 h-5 rounded-full object-cover shadow-sm border border-zinc-200 dark:border-zinc-700"
                     />
@@ -1824,9 +1831,9 @@ export default function App() {
                       <Shield className="w-5 h-5 opacity-70" />
                     ) : tab === "asistencia" ? (
                       <CheckCircle2 className="w-5 h-5 opacity-70" />
-                    ) : profile.avatarUrl ? (
+                    ) : activeProfile.avatarUrl ? (
                       <img
-                        src={profile.avatarUrl}
+                        src={activeProfile.avatarUrl}
                         alt="Avatar"
                         className="w-6 h-6 rounded-full object-cover shadow-sm border border-zinc-200 dark:border-zinc-700"
                       />
@@ -1853,7 +1860,7 @@ export default function App() {
               <span className="font-black text-lg">Modo de Gestión</span>
               <p className="text-sm opacity-90">Estás viendo y editando como: <strong>{adminUserName}</strong></p>
             </div>
-            <button onClick={() => { setAdminUserId(null); setAdminUserName(null); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-bold transition-colors">
+            <button onClick={() => { setAdminUserId(null); setAdminUserName(null); setAdminUserProfile(null); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-bold transition-colors">
               Salir
             </button>
           </div>
@@ -1882,7 +1889,7 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
                 <span className="text-zinc-500 font-medium text-sm">
                   ¡Hola de nuevo,{" "}
-                  <strong className="text-zinc-900 dark:text-white">{profile.name || "Usuario"}</strong>
+                  <strong className="text-zinc-900 dark:text-white">{activeProfile.name || "Usuario"}</strong>
                   ! ✨
                 </span>
                 <input
