@@ -15,11 +15,13 @@ const ProfileView = ({
   setIsDarkMode,
   profile,
   setProfile,
+  adminUserId,
 }: {
   isDarkMode: boolean;
   setIsDarkMode: (v: boolean) => void;
   profile: any;
   setProfile: (p: any) => void;
+  adminUserId?: string | null;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editProfile, setEditProfile] = useState(profile);
@@ -3626,8 +3628,9 @@ export default function App() {
               <ProfileView
                 isDarkMode={isDarkMode}
                 setIsDarkMode={setIsDarkMode}
-                profile={profile}
-                setProfile={setProfile}
+                profile={activeProfile}
+                setProfile={adminUserId ? setAdminUserProfile : setProfile}
+                adminUserId={adminUserId}
               />
             </motion.div>
           ) : null}
