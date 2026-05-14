@@ -552,6 +552,9 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName }: { profile: an
 
   const handleRoleToggle = async (id: string, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    const confirmMessage = `¿Estás seguro de que quieres cambiar el rol de este usuario a ${newRole === 'admin' ? 'Super Admin' : 'Profesor'}?`;
+    if (!window.confirm(confirmMessage)) return;
+
     try {
       await fetch(`/api/admin/users/${id}/role`, {
         method: "PUT",
