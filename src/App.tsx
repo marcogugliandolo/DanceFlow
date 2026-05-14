@@ -124,7 +124,7 @@ const ProfileView = ({
       return;
     }
     try {
-      const res = await fetch('/api/profile/password', {
+      const res = await fetch(`/api/profile/password${adminUserId ? '?admin_user_id=' + adminUserId : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -356,19 +356,21 @@ const ProfileView = ({
               <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2">
                 Cambiar Contraseña
               </h4>
-              <input
-                type="password"
-                value={passwordState.current}
-                onChange={(e) =>
-                  setPasswordState({
-                    ...passwordState,
-                    current: e.target.value,
-                  })
-                }
-                placeholder="Contraseña actual"
-                className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
-                required
-              />
+              {!adminUserId && (
+                <input
+                  type="password"
+                  value={passwordState.current}
+                  onChange={(e) =>
+                    setPasswordState({
+                      ...passwordState,
+                      current: e.target.value,
+                    })
+                  }
+                  placeholder="Contraseña actual"
+                  className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 px-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50"
+                  required
+                />
+              )}
               <input
                 type="password"
                 value={passwordState.new}
