@@ -441,7 +441,8 @@ export const AttendanceView = ({
             if (!activity) return null;
             
             const attendees = Array.isArray(session.attendeeIds) ? session.attendeeIds : [];
-            const percentage = students.length > 0 ? Math.round((attendees.length / students.length) * 100) : 0;
+            const associatedCount = students.filter(s => s.enrolledActivityIds?.includes(session.activityId) || attendees.includes(s.id)).length;
+            const percentage = associatedCount > 0 ? Math.round((attendees.length / associatedCount) * 100) : 0;
             const safePercentage = isNaN(percentage) ? 0 : percentage;
             
             return (
