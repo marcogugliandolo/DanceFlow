@@ -40,10 +40,56 @@ function getSyncData(userId: string) {
           parsed = JSON.parse(s.attendeeIds);
         } catch (e) {}
       }
-      return { ...s, attendeeIds: parsed, substituteTeacherId: s.substitute_teacher_id, substitute_teacher_id: undefined };
+      return { ...s, attendeeIds: parsed, substituteTeacherId: s.substitute_teacher_id, substitute_teacher_id: undefined, attendanceCompleted: Boolean(s.attendanceCompleted) };
     }),
-    students
+    students: students.map((s: any) => {
+      let parsed = [];
+      if (s.enrolledActivityIds) {
+        try { parsed = JSON.parse(s.enrolledActivityIds); } catch(e) {}
+      }
+      return { ...s, enrolledActivityIds: parsed };
+    })
   };
+}
+
+
+function enrollStudentsInActivity(studentIds: string[], activityId: string, effectiveUserId: string) {
+  if (!studentIds || studentIds.length === 0) return;
+  
+  const getStudent = db.prepare("SELECT * FROM students WHERE id = ? AND user_id = ?");
+  const updateStudent = db.prepare("UPDATE students SET enrolledActivityIds = ? WHERE id = ?");
+
+  for (const stuId of studentIds) {
+    const student = getStudent.get(stuId, effectiveUserId) as any;
+    if (student) {
+      let enrolled = [];
+      try {
+        if (student.enrolledActivityIds) {
+          enrolled = JSON.parse(student.enrolledActivityIds);
+        }
+      } catch (e) {}
+      
+      if (!enrolled.includes(activityId)) {
+        enrolled.push(activityId);
+        updateStudent.run(JSON.stringify(enrolled), stuId);
+      }
+    }
+  }
+}
+
+
+try {
+  const allSessions = db.prepare("SELECT * FROM class_sessions").all() as any[];
+  for (const s of allSessions) {
+    if (s.attendeeIds && s.attendeeIds !== '[]') {
+      try {
+        const attendeeIds = JSON.parse(s.attendeeIds);
+        enrollStudentsInActivity(attendeeIds, s.activityId, s.user_id);
+      } catch(e) {}
+    }
+  }
+} catch (e) {
+  console.log("Migration error (might be first run):", e);
 }
 
 // Create tables
@@ -104,11 +150,13 @@ tryAlterTable("ALTER TABLE students ADD COLUMN phone TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN email TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN notes TEXT;");
 tryAlterTable("ALTER TABLE students ADD COLUMN location TEXT;");
+tryAlterTable("ALTER TABLE students ADD COLUMN enrolledActivityIds TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN duration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN defaultDuration REAL DEFAULT 1;");
 tryAlterTable("ALTER TABLE activities ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN user_id TEXT;");
 tryAlterTable("ALTER TABLE class_sessions ADD COLUMN substitute_teacher_id TEXT;");
+tryAlterTable("ALTER TABLE class_sessions ADD COLUMN attendanceCompleted INTEGER DEFAULT 0;");
 tryAlterTable("ALTER TABLE students ADD COLUMN user_id TEXT;");
 
 try {
@@ -445,10 +493,17 @@ app.get("/api/export", requireAuth, (req, res) => {
           ...s,
           attendeeIds: parsed,
           substituteTeacherId: s.substitute_teacher_id,
-          substitute_teacher_id: undefined
+          substitute_teacher_id: undefined,
+          attendanceCompleted: Boolean(s.attendanceCompleted)
         };
       }),
-      students,
+      students: students.map((s: any) => {
+        let parsed = [];
+        if (s.enrolledActivityIds) {
+          try { parsed = JSON.parse(s.enrolledActivityIds); } catch(e) {}
+        }
+        return { ...s, enrolledActivityIds: parsed };
+      }),
       exportDate: new Date().toISOString()
     });
   } catch (err: any) {
@@ -486,17 +541,22 @@ app.post("/api/import", requireAuth, (req, res) => {
 
       // Import students
       if (studentsToImport && Array.isArray(studentsToImport)) {
-        const insStu = db.prepare("INSERT INTO students (id, user_id, name, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)");
+        const insStu = db.prepare("INSERT INTO students (id, user_id, name, phone, email, notes, location, enrolledActivityIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         for (const s of studentsToImport) {
           const newId = crypto.randomUUID();
           studentIdMap.set(s.id, newId);
-          insStu.run(newId, user.id, s.name || 'Estudiante sin nombre', s.phone || null, s.email || null, s.notes || null);
+          // remap enrolledActivityIds
+          let newEnrolled: string[] = [];
+          if (Array.isArray(s.enrolledActivityIds)) {
+             newEnrolled = s.enrolledActivityIds.map((oldActId: string) => activityIdMap.get(oldActId) || oldActId);
+          }
+          insStu.run(newId, user.id, s.name || 'Estudiante sin nombre', s.phone || null, s.email || null, s.notes || null, s.location || null, JSON.stringify(newEnrolled));
         }
       }
 
       // Import sessions (dependent on activities and students)
       if (sessionsToImport && Array.isArray(sessionsToImport)) {
-        const insSes = db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        const insSes = db.prepare("INSERT INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, attendanceCompleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         for (const s of sessionsToImport) {
           const newId = crypto.randomUUID();
           const newActivityId = activityIdMap.get(s.activityId) || s.activityId; // fallback should not happen normally
@@ -513,7 +573,7 @@ app.post("/api/import", requireAuth, (req, res) => {
             } catch (e) {}
           }
 
-          insSes.run(newId, user.id, newActivityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(newAttendeeIds), s.duration ?? 1);
+          insSes.run(newId, user.id, newActivityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(newAttendeeIds), s.duration ?? 1, s.attendanceCompleted ? 1 : 0);
         }
       }
     })();
@@ -603,11 +663,14 @@ app.get("/api/sessions", requireAuth, (req, res) => {
 app.post("/api/sessions", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const sessions = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id, attendanceCompleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   
   db.transaction(() => {
     for (const s of sessions) {
-      insert.run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
+      insert.run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null, s.attendanceCompleted ? 1 : 0);
+      if (s.attendeeIds && s.attendeeIds.length > 0) {
+        enrollStudentsInActivity(s.attendeeIds, s.activityId, (req as any).effectiveUserId);
+      }
     }
   })();
   res.json({ success: true });
@@ -618,8 +681,12 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
   const s = req.body;
   try {
     db.transaction(() => {
-      db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null);
+      db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id, attendanceCompleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(s.id, (req as any).effectiveUserId, s.activityId, s.date || new Date().toISOString().split('T')[0], s.status || 'scheduled', s.justification || null, s.notes || null, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, s.substituteTeacherId || null, s.attendanceCompleted ? 1 : 0);
+      
+      if (s.attendeeIds && s.attendeeIds.length > 0) {
+        enrollStudentsInActivity(s.attendeeIds, s.activityId, (req as any).effectiveUserId);
+      }
 
       if (s.status === 'substitution' && s.substituteTeacherId) {
         const subSessionId = `sub_${s.id}`;
@@ -634,8 +701,8 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
               .run(subActId, s.substituteTeacherId, originActivity.name + ' (Sustitución)', originActivity.location || '', originActivity.pricePerClass || 0, originActivity.paymentType || 'Mensual', 0, originActivity.defaultDuration || 1);
           }
           
-          db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(subSessionId, s.substituteTeacherId, subActId, s.date || new Date().toISOString().split('T')[0], 'held', null, `Sustituyendo a ${user.name}`, '[]', s.duration ?? 1, null);
+          db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id, attendanceCompleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(subSessionId, s.substituteTeacherId, subActId, s.date || new Date().toISOString().split('T')[0], 'held', null, `Sustituyendo a ${user.name}`, '[]', s.duration ?? 1, null, 0);
         }
       } else {
         // If it was reverted from substitution
@@ -759,19 +826,25 @@ app.get("/api/teachers", requireAuth, (req, res) => {
 app.get("/api/students", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const students = db.prepare("SELECT * FROM students WHERE user_id = ?").all((req as any).effectiveUserId);
-  res.json(students);
+  res.json(students.map((s: any) => {
+    let parsed = [];
+    if (s.enrolledActivityIds) {
+      try { parsed = JSON.parse(s.enrolledActivityIds); } catch(e) {}
+    }
+    return { ...s, enrolledActivityIds: parsed };
+  }));
 });
 
 // Save all students (bulk)
 app.post("/api/students", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const students = req.body;
-  const insert = db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location) VALUES (?, ?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location, enrolledActivityIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   
   try {
     db.transaction(() => {
       for (const s of students) {
-        insert.run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
+        insert.run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null, JSON.stringify(s.enrolledActivityIds || []));
       }
     })();
     res.json({ success: true });
@@ -786,8 +859,8 @@ app.post("/api/students/:id", requireAuth, (req, res) => {
   const user = ((req as any).session as any).user;
   const s = req.body;
   try {
-    db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null);
+    db.prepare("INSERT OR REPLACE INTO students (id, user_id, name, phone, email, notes, location, enrolledActivityIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(s.id, (req as any).effectiveUserId, s.name || 'Estudiante', s.phone || null, s.email || null, s.notes || null, s.location || null, JSON.stringify(s.enrolledActivityIds || []));
     res.json({ success: true, student: s });
   } catch (err: any) {
     console.error("POST student error:", err);

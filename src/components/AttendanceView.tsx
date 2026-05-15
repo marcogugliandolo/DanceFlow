@@ -127,7 +127,7 @@ export const AttendanceView = ({
 
   const recentSessions = useMemo(() => {
     return [...sessions]
-      .filter(s => !s.attendanceCompleted && (s.status === "held" || s.status === "cancelled_billed" || s.status === "cancelled_unbilled"))
+      .filter(s => !s.attendanceCompleted && s.status === "held")
       .sort((a, b) => {
         const da = isValidDateStr(a.date) ? new Date(a.date!).getTime() : 0;
         const db = isValidDateStr(b.date) ? new Date(b.date!).getTime() : 0;
@@ -190,10 +190,35 @@ export const AttendanceView = ({
   };
 
   const filteredStudents = useMemo(() => {
-    if (!searchQuery) return students;
-    const lowerQ = searchQuery.toLowerCase();
-    return students.filter(s => s.name.toLowerCase().includes(lowerQ) || (s.email && s.email.toLowerCase().includes(lowerQ)));
-  }, [students, searchQuery]);
+    let result = students;
+
+    if (searchQuery) {
+      const lowerQ = searchQuery.toLowerCase();
+      result = result.filter(s => s.name.toLowerCase().includes(lowerQ) || (s.email && s.email.toLowerCase().includes(lowerQ)));
+    }
+
+    if (viewMode === "pass" && selectedSessionId) {
+      const session = sessions.find(s => s.id === selectedSessionId);
+      if (session) {
+        result = result.filter(student => {
+          if (searchQuery) return true; // Si hay búsqueda, mostrar de todos los alumnos
+          const isEnrolled = student.enrolledActivityIds?.includes(session.activityId);
+          const isAlreadyAttending = session.attendeeIds?.includes(student.id);
+          return isEnrolled || isAlreadyAttending;
+        });
+      }
+    }
+
+    if (viewMode === "table" && selectedActivityId !== "all") {
+      result = result.filter(student => {
+        const isEnrolled = student.enrolledActivityIds?.includes(selectedActivityId);
+        const hasAttendedAny = tableSessions.some(session => session.attendeeIds?.includes(student.id));
+        return isEnrolled || hasAttendedAny;
+      });
+    }
+
+    return result;
+  }, [students, searchQuery, viewMode, selectedSessionId, sessions, selectedActivityId, tableSessions]);
 
   if (selectedSession && selectedActivity && viewMode === "pass") {
     const attendees = Array.isArray(selectedSession.attendeeIds) ? selectedSession.attendeeIds : [];

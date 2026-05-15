@@ -935,7 +935,8 @@ export default function App() {
     email: string;
     notes: string;
     location: string;
-  }>({ name: "", phone: "", email: "", notes: "", location: "" });
+    enrolledActivityIds: string[];
+  }>({ name: "", phone: "", email: "", notes: "", location: "", enrolledActivityIds: [] });
 
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [studentCurrentPage, setStudentCurrentPage] = useState(1);
@@ -2489,9 +2490,16 @@ export default function App() {
                             const previousSessions = sessions.filter(s => s.activityId === actId);
                             if (previousSessions.length > 0) {
                               const latestSession = previousSessions.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())[0];
-                              setSessionAttendeeIds(latestSession.attendeeIds || []);
+                              
+                              // Merge latest session attendees with actively enrolled students who might be new
+                              const latestIds = latestSession.attendeeIds || [];
+                              const additionalEnrolled = students.filter(student => student.enrolledActivityIds?.includes(actId) && !latestIds.includes(student.id)).map(student => student.id);
+                              
+                              setSessionAttendeeIds([...latestIds, ...additionalEnrolled]);
                             } else {
-                              setSessionAttendeeIds([]);
+                              // If first session, use enrolled students
+                              const enrolledStudents = students.filter(student => student.enrolledActivityIds?.includes(actId)).map(student => student.id);
+                              setSessionAttendeeIds(enrolledStudents);
                             }
                           } else {
                             setSessionAttendeeIds([]);
@@ -3450,7 +3458,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setEditingStudentId(null);
-                      setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
+                      setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "", enrolledActivityIds: [] });
                       setShowStudentModal("create");
                     }}
                     className="h-11 px-6 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl flex items-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
@@ -3542,6 +3550,14 @@ export default function App() {
                                     {student.location}
                                   </span>
                                 )}
+                                {student.enrolledActivityIds && student.enrolledActivityIds.length > 0 && (
+                                  <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 mt-1 flex-wrap">
+                                    {student.enrolledActivityIds.map((actId: string) => {
+                                      const act = activities.find((a: any) => a.id === actId);
+                                      return act ? (<span key={actId} className="bg-rose-100 dark:bg-rose-500/20 px-1.5 py-0.5 rounded-md">{act.name}</span>) : null;
+                                    })}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -3576,6 +3592,7 @@ export default function App() {
                                     email: student.email || "",
                                     notes: student.notes || "",
                                     location: student.location || "",
+                                    enrolledActivityIds: student.enrolledActivityIds || [],
                                   });
                                   setShowStudentModal("edit");
                                 }}
@@ -3696,11 +3713,12 @@ export default function App() {
                         email: editStudentData.email.trim(),
                         notes: editStudentData.notes.trim(),
                         location: editStudentData.location.trim(),
+                        enrolledActivityIds: editStudentData.enrolledActivityIds,
                       });
                     }
                     setShowStudentModal(null);
                     setEditingStudentId(null);
-                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
+                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "", enrolledActivityIds: [] });
                   }
 
                 }}
@@ -3751,6 +3769,42 @@ export default function App() {
                     className="w-full h-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 rounded-2xl text-sm font-medium border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-900 dark:text-zinc-100"
                     placeholder="Ciudad, barrio..."
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">
+                    Clases asociadas
+                  </label>
+                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                    {activities.length === 0 ? (
+                      <div className="text-xs text-zinc-500 italic">No hay clases creadas.</div>
+                    ) : (
+                      activities.map((act) => {
+                        const isEnrolled = editStudentData.enrolledActivityIds.includes(act.id);
+                        return (
+                          <div
+                            key={act.id}
+                            onClick={() => {
+                              setEditStudentData(d => ({
+                                ...d,
+                                enrolledActivityIds: isEnrolled 
+                                  ? d.enrolledActivityIds.filter(id => id !== act.id)
+                                  : [...d.enrolledActivityIds, act.id]
+                              }));
+                            }}
+                            className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all ${isEnrolled ? "bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30" : "bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent"}`}
+                          >
+                            <span className={`text-sm font-medium ${isEnrolled ? "text-rose-700 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300"}`}>
+                              {act.name}
+                            </span>
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${isEnrolled ? "bg-rose-500 text-white" : "border-2 border-zinc-300 dark:border-zinc-600"}`}>
+                              {isEnrolled && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -3819,7 +3873,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     setEditingStudentId(null);
-                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "" });
+                    setEditStudentData({ name: "", phone: "", email: "", notes: "", location: "", enrolledActivityIds: [] });
                     setShowStudentModal("create");
                   }}
                   className="w-full mb-6 h-12 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
@@ -3833,8 +3887,30 @@ export default function App() {
                     <p className="text-center text-sm text-zinc-500 py-4 font-medium">
                       No hay alumnos aún. Crealos arriba.
                     </p>
-                  ) : (
-                    students.map((student) => {
+                  ) : (() => {
+                    const filteredStudents = students.filter((student) => {
+                      const actId = showAttendeesModal === "create" ? sessionActId : editSessionActId;
+                      const isEnrolled = student.enrolledActivityIds?.includes(actId);
+                      const isAlreadySelected = showAttendeesModal === "create" 
+                        ? sessionAttendeeIds.includes(student.id)
+                        : editSessionAttendeeIds.includes(student.id);
+                      return isEnrolled || isAlreadySelected;
+                    });
+                    
+                    if (filteredStudents.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+                            Sin estudiantes
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            No hay estudiantes inscritos en esta actividad. Puedes inscribirlos desde su perfil en "Gestión de Alumnos".
+                          </p>
+                        </div>
+                      );
+                    }
+                    
+                    return filteredStudents.map((student) => {
                       const isSelected =
                         showAttendeesModal === "create"
                           ? sessionAttendeeIds.includes(student.id)
@@ -3882,8 +3958,8 @@ export default function App() {
                           </div>
                         </div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                 </div>
               </div>
 
