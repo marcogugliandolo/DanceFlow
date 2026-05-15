@@ -20,12 +20,20 @@ const StudentTableCard = ({
   toggleAttendanceTable: (sessionId: string, studentId: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const attendedCount = tableSessions.filter(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id)).length;
-  const totalCount = tableSessions.length;
+  
+  // Filter sessions that only belong to activities the student is enrolled in, or if they actually attended
+  const relevantSessions = tableSessions.filter(s => {
+    const isEnrolled = student.enrolledActivityIds?.includes(s.activityId);
+    const hasAttended = Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id);
+    return isEnrolled || hasAttended;
+  });
+
+  const attendedCount = relevantSessions.filter(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id)).length;
+  const totalCount = relevantSessions.length;
   const attendancePercentage = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0;
   
-  const displaySessions = isExpanded ? tableSessions : tableSessions.slice(0, 5);
-  const hasMore = tableSessions.length > 5;
+  const displaySessions = isExpanded ? relevantSessions : relevantSessions.slice(0, 5);
+  const hasMore = relevantSessions.length > 5;
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 group">
@@ -244,7 +252,7 @@ export const AttendanceView = ({
                 </span>
                 <span className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-lg text-xs font-bold uppercase">
                   <Users className="w-3.5 h-3.5" />
-                  {attendees.length} / {students.length} asist.
+                  {attendees.length} / {students.filter(s => s.enrolledActivityIds?.includes(selectedSession.activityId) || attendees.includes(s.id)).length} asist.
                 </span>
               </div>
             </div>
@@ -299,7 +307,14 @@ export const AttendanceView = ({
                     >
                       <div className="flex flex-col items-start gap-1 text-left">
                         <span className="font-bold text-[13px]">{student.name}</span>
-                        {student.phone && <span className="text-[10px] opacity-70 font-medium">{student.phone}</span>}
+                        <div className="flex gap-2 items-center">
+                          {student.phone && <span className="text-[10px] opacity-70 font-medium">{student.phone}</span>}
+                          {student.enrolledActivityIds?.includes(selectedSessionId ? sessions.find(s => s.id === selectedSessionId)?.activityId || "" : "") && (
+                            <span className="text-[9px] font-bold text-rose-500 bg-rose-100 dark:bg-rose-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+                              Inscrito
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm transition-colors ${
@@ -450,7 +465,7 @@ export const AttendanceView = ({
                   <div className="flex justify-between items-end mb-2">
                     <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                       <span className="text-2xl font-black text-emerald-500">{attendees.length}</span>
-                      <span className="opacity-60"> / {students.length} asist.</span>
+                      <span className="opacity-60"> / {associatedCount} asist.</span>
                     </div>
                     <div className="text-xs font-bold opacity-60">{safePercentage || 0}%</div>
                   </div>

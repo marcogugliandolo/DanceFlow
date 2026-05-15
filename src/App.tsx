@@ -3670,7 +3670,7 @@ export default function App() {
               initial={{ scale: 0.95, y: 10, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 10, opacity: 0 }}
-              className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-zinc-200/50 dark:border-white/10"
+              className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-zinc-200/50 dark:border-white/10"
             >
               <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
                 <h3 className="font-black text-xl text-zinc-900 dark:text-white">
@@ -3722,7 +3722,7 @@ export default function App() {
                   }
 
                 }}
-                className="p-6 space-y-4"
+                className="p-6 space-y-4 overflow-y-auto custom-scrollbar"
               >
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Nombre Completo *</label>
@@ -4003,15 +4003,16 @@ export default function App() {
                   );
 
                 // Agrupar contador por actividad
-                const activityCounts = studentSessions.reduce(
-                  (acc, session) => {
-                    if (session.status !== "held") return acc;
-                    acc[session.activityId] =
-                      (acc[session.activityId] || 0) + 1;
+                const activityCounts = (student.enrolledActivityIds || []).reduce((acc, actId) => {
+                    acc[actId] = 0;
                     return acc;
-                  },
-                  {} as Record<string, number>,
-                );
+                }, {} as Record<string, number>);
+                
+                studentSessions.forEach(session => {
+                    if (session.status === "held") {
+                        activityCounts[session.activityId] = (activityCounts[session.activityId] || 0) + 1;
+                    }
+                });
 
                 return (
                   <>
