@@ -24,7 +24,30 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Database setup
-const db = new Database(path.join(dataDir, "salsanova.db"));
+let db: any;
+const dbPath = path.join(dataDir, "salsanova.db");
+
+try {
+  db = new Database(dbPath);
+  // Force a read to test database integrity before making any writes
+  // If the disk image is malformed, this will throw an error immediately
+  db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+} catch (err: any) {
+  if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('not a database') || err.code === 'SQLITE_CORRUPT') {
+    console.error("=========================================");
+    console.error("CRITICAL: Database corruption detected!");
+    console.error("Backing up the corrupted database and creating a new one to allow server start.");
+    console.error("=========================================");
+    const backupPath = path.join(dataDir, `salsanova_corrupt_${Date.now()}.db`);
+    try {
+      fs.renameSync(dbPath, backupPath);
+      console.error(`Corrupted file moved to: ${backupPath}`);
+    } catch(e) {}
+    db = new Database(dbPath);
+  } else {
+    throw err;
+  }
+}
 
 function getSyncData(userId: string) {
   const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(userId);
