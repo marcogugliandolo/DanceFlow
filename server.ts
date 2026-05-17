@@ -36,12 +36,11 @@ try {
   if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('not a database') || err.code === 'SQLITE_CORRUPT') {
     console.error("=========================================");
     console.error("CRITICAL: Database corruption detected!");
-    console.error("Backing up the corrupted database and creating a new one to allow server start.");
+    console.error("Deleting the corrupted database and creating a new one to allow server start.");
     console.error("=========================================");
-    const backupPath = path.join(dataDir, `salsanova_corrupt_${Date.now()}.db`);
     try {
-      fs.renameSync(dbPath, backupPath);
-      console.error(`Corrupted file moved to: ${backupPath}`);
+      fs.unlinkSync(dbPath);
+      console.error(`Corrupted file deleted.`);
     } catch(e) {}
     db = new Database(dbPath);
   } else {
