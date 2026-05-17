@@ -3700,6 +3700,7 @@ export default function App() {
                         email: editStudentData.email.trim(),
                         notes: editStudentData.notes.trim(),
                         location: editStudentData.location.trim(),
+                        enrolledActivityIds: editStudentData.enrolledActivityIds,
                       });
                       if (showAttendeesModal === "create") {
                         setSessionAttendeeIds(prev => [...prev, newId]);

@@ -17,6 +17,7 @@ export interface Student {
   email?: string;
   notes?: string;
   location?: string;
+  enrolledActivityIds?: string[];
 }
 
 export interface ClassSession {
