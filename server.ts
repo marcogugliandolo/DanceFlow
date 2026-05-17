@@ -24,45 +24,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Database setup
-let db: any;
-const dbPath = path.join(dataDir, "salsanova.db");
-
-try {
-  db = new Database(dbPath);
-  // Force a read to test database integrity before making any writes
-  // If the disk image is malformed, this will throw an error immediately
-  db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-} catch (err: any) {
-  if (err.message.includes('malformed') || err.message.includes('corrupt') || err.message.includes('not a database') || err.code === 'SQLITE_CORRUPT') {
-    console.error("=========================================");
-    console.error("Database corruption or WAL mismatch detected!");
-    console.error("Attempting to recover by removing WAL files...");
-    console.error("=========================================");
-    
-    try { db.close(); } catch(e) {}
-    try { fs.unlinkSync(dbPath + "-wal"); } catch(e) {}
-    try { fs.unlinkSync(dbPath + "-shm"); } catch(e) {}
-
-    let recovered = false;
-    try {
-      db = new Database(dbPath);
-      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-      recovered = true;
-      console.error("Recovery successful! The database is readable again.");
-    } catch(e) {}
-
-    if (!recovered) {
-      console.error("Still corrupted. Backing up the corrupted database and creating a new one.");
-      const backupPath = path.join(dataDir, `salsanova_corrupt_${Date.now()}.db`);
-      try {
-        fs.renameSync(dbPath, backupPath);
-      } catch(e) {}
-      db = new Database(dbPath);
-    }
-  } else {
-    throw err;
-  }
-}
+const db = new Database(path.join(dataDir, "salsanova.db"));
 
 function getSyncData(userId: string) {
   const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(userId);
