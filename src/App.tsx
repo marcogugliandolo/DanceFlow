@@ -526,7 +526,7 @@ const containerVariants = {
   },
 };
 
-const AdminPanel = ({ profile, setAdminUserId, setAdminUserName }: { profile: any, setAdminUserId: (id: string | null) => void, setAdminUserName: (name: string | null) => void }) => {
+const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserProfile }: { profile: any, setAdminUserId: (id: string | null) => void, setAdminUserName: (name: string | null) => void, setAdminUserProfile: (p: any) => void }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -1885,7 +1885,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.15 }}
               >
-                <AdminPanel profile={profile} setAdminUserId={setAdminUserId} setAdminUserName={setAdminUserName} />
+                <AdminPanel profile={profile} setAdminUserId={setAdminUserId} setAdminUserName={setAdminUserName} setAdminUserProfile={setAdminUserProfile} />
               </motion.div>
             ) : (
             <motion.div
