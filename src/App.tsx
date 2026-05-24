@@ -755,8 +755,8 @@ export default function App() {
     theme: 'light' | 'dark';
     role?: string;
   }>({
-    name: "Profesor",
-    email: "profesor@ejemplo.com",
+    name: "Ana Salsanova",
+    email: "ana@salsanova.com",
     avatarUrl: "",
     theme: "dark",
     role: "user",

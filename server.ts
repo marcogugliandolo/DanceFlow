@@ -362,18 +362,24 @@ app.post("/api/auth/logout", (req, res) => {
   });
 });
 
-app.post("/api/profile", (req, res) => {
-  const user = ((req as any).session as any).user;
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+app.post("/api/profile", requireAuth, (req, res) => {
+  const effectiveUserId = (req as any).effectiveUserId;
+  const sessionUser = ((req as any).session as any).user;
 
   const { name, email, avatarUrl, theme } = req.body;
   try {
+    const defaultTheme = theme || "dark";
     db.prepare("UPDATE users SET name = ?, email = ?, avatar_url = ?, theme = ? WHERE id = ?")
-      .run(name, email, avatarUrl, theme || user.theme, user.id);
+      .run(name, email, avatarUrl, defaultTheme, effectiveUserId);
     
-    // Update session user
-    ((req as any).session as any).user = { ...user, name, email, avatar_url: avatarUrl, theme: theme || user.theme };
-    res.json({ success: true, user: ((req as any).session as any).user });
+    const updatedUser = db.prepare("SELECT * FROM users WHERE id = ?").get(effectiveUserId) as any;
+    
+    // Update session user only if editing self
+    if (sessionUser.id === effectiveUserId) {
+      ((req as any).session as any).user = updatedUser;
+    }
+    
+    res.json({ success: true, user: updatedUser });
   } catch (err: any) {
     res.status(500).json({ error: "DB Error", details: err.message });
   }
@@ -384,12 +390,18 @@ app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body;
   // Ana Salsanova default account
   if (username.toLowerCase() === "ana" && password === "salsanova") {
-    let user = db.prepare("SELECT * FROM users WHERE email = ?").get("profesor@ejemplo.com") as any;
+    let user = db.prepare("SELECT * FROM users WHERE email = ?").get("ana@salsanova.com") as any;
     if (!user) {
-      const id = crypto.randomUUID();
-      db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
-        .run(id, "Profesor", "profesor@ejemplo.com", "salsanova", "user");
-      user = { id, name: "Profesor", email: "profesor@ejemplo.com", role: "user" };
+      let legacyUser = db.prepare("SELECT * FROM users WHERE email = ?").get("profesor@ejemplo.com") as any;
+      if (legacyUser) {
+        db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run("Ana Salsanova", "ana@salsanova.com", legacyUser.id);
+        user = db.prepare("SELECT * FROM users WHERE id = ?").get(legacyUser.id) as any;
+      } else {
+        const id = crypto.randomUUID();
+        db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
+          .run(id, "Ana Salsanova", "ana@salsanova.com", "salsanova", "user");
+        user = { id, name: "Ana Salsanova", email: "ana@salsanova.com", role: "user" };
+      }
     }
     ((req as any).session as any).user = user;
     try {
