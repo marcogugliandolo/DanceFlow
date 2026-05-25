@@ -38,7 +38,7 @@ const StudentTableCard = ({
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 group">
       <div className="flex justify-between items-start mb-5 pb-5 border-b border-zinc-100 dark:border-zinc-800/80">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center font-black text-lg text-zinc-400 shrink-0 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 group-hover:text-emerald-500 transition-colors">
             {student.name.charAt(0).toUpperCase()}
           </div>
@@ -49,7 +49,7 @@ const StudentTableCard = ({
             </span>
           </div>
         </div>
-        <div className="flex flex-col items-end shrink-0">
+        <div className="flex flex-col items-end shrink-0 ml-3">
           <div className="flex items-baseline gap-1 text-emerald-500">
             <span className="text-2xl font-black leading-none">{attendedCount}</span>
             <span className="text-xs font-bold opacity-60">/ {totalCount}</span>
