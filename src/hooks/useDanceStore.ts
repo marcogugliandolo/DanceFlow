@@ -329,8 +329,10 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean,
     lastLocalUpdate.current = Date.now();
   };
 
+  const sortedActivities = [...activities].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
   return {
-    activities,
+    activities: sortedActivities,
     sessions,
     students,
     summary,
