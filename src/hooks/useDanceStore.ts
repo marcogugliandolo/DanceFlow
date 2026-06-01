@@ -330,11 +330,12 @@ export function useDanceStore(selectedMonth?: string, isAuthenticated?: boolean,
   };
 
   const sortedActivities = [...activities].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   return {
     activities: sortedActivities,
     sessions,
-    students,
+    students: sortedStudents,
     summary,
     setData,
     addActivity,
