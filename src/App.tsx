@@ -507,6 +507,7 @@ import {
   Check,
   Shield,
   Users,
+  UserPlus,
 } from "lucide-react";
 
 const cardVariants = {
@@ -532,6 +533,16 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
 
+  // Create user modal state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("salsanova");
+  const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>("user");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   const fetchUsers = async () => {
     try {
       const res = await fetch("/api/admin/users");
@@ -550,6 +561,45 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
     fetchUsers();
   }, []);
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) {
+      setCreateError("Por favor completa el nombre y el correo electrónico.");
+      return;
+    }
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          password: newUserPassword.trim() || "salsanova",
+          role: newUserRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error || "Error al crear el usuario");
+      } else {
+        setIsCreateModalOpen(false);
+        setNewUserName("");
+        setNewUserEmail("");
+        setNewUserPassword("salsanova");
+        setNewUserRole("user");
+        setFeedbackMessage({ type: 'success', text: `Usuario "${data.user.name}" creado con éxito.` });
+        setTimeout(() => setFeedbackMessage(null), 4000);
+        fetchUsers();
+      }
+    } catch (err: any) {
+      setCreateError("Error de conexión al crear el usuario");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const handleRoleToggle = async (id: string, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const confirmMessage = `¿Estás seguro de que quieres cambiar el rol de este usuario a ${newRole === 'admin' ? 'Super Admin' : 'Profesor'}?`;
@@ -561,6 +611,8 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole })
       });
+      setFeedbackMessage({ type: 'success', text: "Rol actualizado correctamente." });
+      setTimeout(() => setFeedbackMessage(null), 3000);
       fetchUsers();
     } catch (e) {
       console.error(e);
@@ -581,13 +633,21 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!window.confirm("¿Seguro que quieres eliminar este usuario y todos sus datos? Esta acción es irreversible.")) return;
+  const handleDeleteUser = async (id: string, name: string) => {
+    if (!window.confirm(`¿Seguro que quieres eliminar permanentemente al usuario "${name}" y todos sus datos? Esta acción es irreversible.`)) return;
     try {
-      await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
-      fetchUsers();
+      const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setFeedbackMessage({ type: 'success', text: `Usuario "${name}" eliminado correctamente.` });
+        setTimeout(() => setFeedbackMessage(null), 4000);
+        fetchUsers();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Error al eliminar el usuario");
+      }
     } catch (e) {
       console.error(e);
+      alert("Error de conexión al eliminar el usuario");
     }
   };
 
@@ -647,7 +707,7 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
                     <div className="font-bold">{act?.name || 'Desconocida'}</div>
                     <div className="text-sm text-zinc-500">{s.date} - Duración: {s.duration || 1}h</div>
                   </div>
-                  <div className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${s.status === 'held' ? 'bg-emerald-100 text-emerald-600' : s.status === 'substitution' ? 'bg-cyan-100 text-cyan-600' : 'bg-red-100 text-red-600'}`}>
+                  <div className={`px-2 py-1 text-[10px] font-bold rounded uppercase whitespace-nowrap ${s.status === 'held' ? 'bg-emerald-100 text-emerald-600' : s.status === 'substitution' ? 'bg-cyan-100 text-cyan-600' : 'bg-red-100 text-red-600'}`}>
                     {s.status === 'held' ? 'Realizada' : s.status === 'substitution' ? 'Sustitución' : 'Cancelada'}
                   </div>
                 </div>
@@ -664,16 +724,39 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center">
-          <Shield className="w-6 h-6 text-rose-500" />
+      {/* Header with New User button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center shrink-0">
+            <Shield className="w-6 h-6 text-rose-500" />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black text-zinc-900 dark:text-white">Panel Super Admin</h2>
+            <p className="text-zinc-500 text-sm font-medium">Gestiona y crea profesores o administradores de la academia.</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-3xl font-black text-zinc-900 dark:text-white">Panel Super Admin</h2>
-          <p className="text-zinc-500 text-sm font-medium">Gestiona todos los profesores y sus datos en la plataforma.</p>
-        </div>
+
+        <button
+          onClick={() => {
+            setCreateError(null);
+            setIsCreateModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white font-bold rounded-2xl shadow-sm hover:opacity-95 active:scale-95 transition-all text-sm self-start sm:self-auto shrink-0 cursor-pointer"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Crear Usuario</span>
+        </button>
       </div>
 
+      {/* Notification Toast */}
+      {feedbackMessage && (
+        <div className={`p-4 rounded-2xl text-sm font-bold flex items-center gap-2 shadow-sm ${feedbackMessage.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'}`}>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{feedbackMessage.text}</span>
+        </div>
+      )}
+
+      {/* Users Table */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/5 rounded-3xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
@@ -705,7 +788,8 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
                   <td className="px-6 py-4 text-center">
                     <button 
                       onClick={() => handleRoleToggle(u.id, u.role)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${u.role === 'admin' ? 'bg-fuchsia-100 text-fuchsia-600 hover:bg-fuchsia-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'}`}
+                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${u.role === 'admin' ? 'bg-fuchsia-100 text-fuchsia-600 hover:bg-fuchsia-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'}`}
+                      title="Cambiar rol"
                     >
                       {u.role === 'admin' ? 'Admin' : 'Profesor'}
                     </button>
@@ -717,22 +801,29 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex gap-2 justify-center text-xs font-bold text-zinc-500">
-                      <span title="Actividades">{u.activitiesCount} A</span>
+                      <span title="Actividades">{u.activitiesCount || 0} A</span>
                       <span>·</span>
-                      <span title="Sesiones">{u.sessionsCount} S</span>
+                      <span title="Sesiones">{u.sessionsCount || 0} S</span>
                       <span>·</span>
-                      <span title="Alumnos">{u.studentsCount} U</span>
+                      <span title="Alumnos">{u.studentsCount || 0} U</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleViewDetails(u.id)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold text-xs rounded-xl active:scale-95 transition-all">
-                      Ver Clases
-                    </button>
-                    {profile.id !== u.id && (
-                      <button onClick={() => handleDeleteUser(u.id)} className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl active:scale-95 transition-all ml-2">
-                        Eliminar
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => handleViewDetails(u.id)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold text-xs rounded-xl active:scale-95 transition-all cursor-pointer">
+                        Ver Clases
                       </button>
-                    )}
+                      {profile.id !== u.id && (
+                        <button 
+                          onClick={() => handleDeleteUser(u.id, u.name)} 
+                          className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 font-bold text-xs rounded-xl active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -740,6 +831,126 @@ const AdminPanel = ({ profile, setAdminUserId, setAdminUserName, setAdminUserPro
           </table>
         </div>
       </div>
+
+      {/* Create User Modal */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative"
+            >
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white">Crear Nuevo Usuario</h3>
+                  <p className="text-xs text-zinc-500">Añade un profesor o administrador a la plataforma.</p>
+                </div>
+              </div>
+
+              {createError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                  {createError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateUser} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. David Ybón"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Ej. david@salsanova.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Contraseña Inicial
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="salsanova"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all font-mono"
+                  />
+                  <p className="text-[10px] text-zinc-400 mt-1">Por defecto: "salsanova". El usuario podrá cambiarla desde su perfil.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Rol
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewUserRole("user")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${newUserRole === 'user' ? 'bg-rose-50 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-500/40 shadow-sm' : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                    >
+                      Profesor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewUserRole("admin")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${newUserRole === 'admin' ? 'bg-fuchsia-50 dark:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-300 dark:border-fuchsia-500/40 shadow-sm' : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                    >
+                      Super Admin
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="flex-1 py-2.5 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createLoading}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {createLoading ? "Creando..." : "Crear Usuario"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -1133,6 +1344,7 @@ export default function App() {
     setEditSessionJustification(session.justification || "");
     setEditSessionNotes(session.notes || "");
     setEditSessionAttendeeIds(session.attendeeIds || []);
+    setEditSessionSubstituteTeacherId(session.substituteTeacherId || "");
   };
 
   const handleExportPDF = async () => {
@@ -1349,14 +1561,14 @@ export default function App() {
         textColor: 255,
         fontStyle: "bold",
       },
-      styles: { fontSize: 9, cellPadding: 4, textColor: [50, 50, 50] },
+      styles: { fontSize: 8.5, cellPadding: 3.5, textColor: [50, 50, 50] },
       columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 25 },
+        0: { cellWidth: 32 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 35 },
         4: { cellWidth: "auto" },
-        5: { cellWidth: 20 },
+        5: { cellWidth: 18 },
       },
       alternateRowStyles: { fillColor: [250, 250, 250] },
       margin: { top: 70 },
@@ -2870,7 +3082,7 @@ export default function App() {
                                         </svg>
                                       )}
                                     </div>
-                                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 whitespace-nowrap">
                                       {option.label}
                                     </span>
                                     <input
@@ -3313,20 +3525,20 @@ export default function App() {
                                         </span>
                                       )}
                                       {session.status === "substitution" && (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400">
+                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400 whitespace-nowrap">
                                           Sustitución
                                         </span>
                                       )}
                                       {session.status ===
                                         "cancelled_billed" && (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                                          Canceladas (Cobra)
+                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 whitespace-nowrap">
+                                          Can. (Cobra)
                                         </span>
                                       )}
                                       {session.status ===
                                         "cancelled_unbilled" && (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
-                                          Canceladas (No Cobra)
+                                        <span className="px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest font-black bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 whitespace-nowrap">
+                                          Can. (No Cobra)
                                         </span>
                                       )}
                                       <span className="px-2 py-0.5 rounded-md text-[10px] uppercase tracking-widest font-black bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400 whitespace-nowrap flex items-center gap-1 shadow-sm">

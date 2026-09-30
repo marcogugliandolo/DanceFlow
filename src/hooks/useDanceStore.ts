@@ -31,9 +31,9 @@ export function computeSummary(activities: Activity[], sessions: ClassSession[],
       };
       activityStudents[act.id] = new Set();
 
-      // Add monthly fee if they have any sessions in this month, or if it's recurring
+      // Add monthly fee if they have any valid sessions in this month, or if it's recurring
       if (act.paymentType === 'monthly') {
-        const hasSessions = filteredSessions.some(s => s.activityId === act.id);
+        const hasSessions = filteredSessions.some(s => s.activityId === act.id && (s.status === 'held' || s.status === 'cancelled_billed'));
         if (hasSessions || act.isRecurring) {
           stats.activities[act.id].totalRevenue = act.pricePerClass || 0;
           stats.totalRevenue += act.pricePerClass || 0;

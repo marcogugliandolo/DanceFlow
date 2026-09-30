@@ -163,6 +163,27 @@ try {
   db.prepare("UPDATE users SET role = 'admin' WHERE email = 'marcogugliandolo94@gmail.com'").run();
 } catch (e) {}
 
+// Seed default users if they don't exist
+const defaultUsersToSeed = [
+  { name: "Super Admin", email: "admin@salsanova.com", password: "salsanova", role: "admin" },
+  { name: "Ana Salsanova", email: "ana@salsanova.com", password: "salsanova", role: "user" },
+  { name: "David Ybón", email: "david@salsanova.com", password: "salsanova", role: "user" },
+  { name: "Laura Rancaño", email: "laura@salsanova.com", password: "salsanova", role: "user" },
+  { name: "Débora Muñoz", email: "debora@salsanova.com", password: "salsanova", role: "user" },
+  { name: "Ana Reborido", email: "ana.reborido@salsanova.com", password: "salsanova", role: "user" },
+  { name: "Barbara Dieppa", email: "barbara@salsanova.com", password: "salsanova", role: "user" },
+];
+
+for (const u of defaultUsersToSeed) {
+  try {
+    const existing = db.prepare("SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?").get(u.email.toLowerCase(), u.name.toLowerCase());
+    if (!existing) {
+      const id = crypto.randomUUID();
+      db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)").run(id, u.name, u.email, u.password, u.role);
+    }
+  } catch (err) {}
+}
+
 // Migrate old data assuming it belongs to the first created user
 const firstUser = db.prepare("SELECT id FROM users ORDER BY ROWID ASC LIMIT 1").get() as any;
 if (firstUser) {
@@ -341,7 +362,47 @@ app.get("/api/admin/users/:id/data", requireAdmin, (req, res) => {
   }
 });
 
+app.post("/api/admin/users", requireAdmin, (req, res) => {
+  const { name, email, password, role } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "El nombre es obligatorio" });
+  }
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: "El correo electrónico es obligatorio" });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = name.trim();
+  const cleanRole = role === 'admin' ? 'admin' : 'user';
+  const cleanPassword = (password && password.trim()) ? password.trim() : 'salsanova';
+
+  const existing = db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(cleanEmail);
+  if (existing) {
+    return res.status(400).json({ error: "Ya existe un usuario con este correo electrónico" });
+  }
+
+  try {
+    const id = crypto.randomUUID();
+    db.prepare("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)")
+      .run(id, cleanName, cleanEmail, cleanPassword, cleanRole);
+
+    const newUser = db.prepare(`
+      SELECT users.id, users.name, users.email, users.avatar_url, users.role, users.last_active, 
+             0 as activitiesCount, 0 as sessionsCount, 0 as studentsCount
+      FROM users WHERE id = ?
+    `).get(id);
+
+    res.json({ success: true, user: newUser });
+  } catch (err: any) {
+    res.status(500).json({ error: "Error al crear el usuario: " + err.message });
+  }
+});
+
 app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
+  const sessionUser = ((req as any).session as any).user;
+  if (sessionUser && sessionUser.id === req.params.id) {
+    return res.status(400).json({ error: "No puedes eliminar tu propia cuenta de administrador" });
+  }
   try {
     db.transaction(() => {
       db.prepare("DELETE FROM activities WHERE user_id = ?").run(req.params.id);
@@ -430,7 +491,27 @@ app.post("/api/auth/login", (req, res) => {
     }
   }
 
-  res.status(401).json({ error: "Invalid credentials" });
+  // Database lookup for any created user (by email or exact name or first name)
+  if (username) {
+    const trimmed = username.trim().toLowerCase();
+    const dbUser = db.prepare(`
+      SELECT * FROM users 
+      WHERE LOWER(email) = ? OR LOWER(name) = ? OR LOWER(name) LIKE ?
+    `).get(trimmed, trimmed, `${trimmed}%`) as any;
+
+    if (dbUser && (dbUser.password === password || !dbUser.password)) {
+      ((req as any).session as any).user = dbUser;
+      db.prepare("UPDATE users SET last_active = ? WHERE id = ?").run(new Date().toISOString(), dbUser.id);
+      try {
+        const syncData = getSyncData(dbUser.id);
+        return res.json({ success: true, user: dbUser, syncData });
+      } catch {
+        return res.json({ success: true, user: dbUser });
+      }
+    }
+  }
+
+  res.status(401).json({ error: "Credenciales incorrectas" });
 });
 
 app.post("/api/profile/password", requireAuth, (req, res) => {
@@ -710,11 +791,14 @@ app.post("/api/sessions/:id", requireAuth, (req, res) => {
           const existingAct = db.prepare("SELECT id FROM activities WHERE id = ?").get(subActId);
           if (!existingAct) {
             db.prepare("INSERT INTO activities (id, user_id, name, location, pricePerClass, paymentType, isRecurring, defaultDuration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-              .run(subActId, s.substituteTeacherId, originActivity.name + ' (Sustitución)', originActivity.location || '', originActivity.pricePerClass || 0, originActivity.paymentType || 'Mensual', 0, originActivity.defaultDuration || 1);
+              .run(subActId, s.substituteTeacherId, originActivity.name + ' (Sustitución)', originActivity.location || '', originActivity.pricePerClass || 0, 'fixed', 0, originActivity.defaultDuration || 1);
           }
           
+          const originTeacher = db.prepare("SELECT name FROM users WHERE id = ?").get((req as any).effectiveUserId) as any;
+          const teacherName = originTeacher ? originTeacher.name : user.name;
+          
           db.prepare("INSERT OR REPLACE INTO class_sessions (id, user_id, activityId, date, status, justification, notes, attendeeIds, duration, substitute_teacher_id, attendanceCompleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(subSessionId, s.substituteTeacherId, subActId, s.date || new Date().toISOString().split('T')[0], 'held', null, `Sustituyendo a ${user.name}`, '[]', s.duration ?? 1, null, 0);
+            .run(subSessionId, s.substituteTeacherId, subActId, s.date || new Date().toISOString().split('T')[0], 'held', null, `Sustituyendo a ${teacherName}`, JSON.stringify(s.attendeeIds || []), s.duration ?? 1, null, 0);
         }
       } else {
         // If it was reverted from substitution
