@@ -6,18 +6,18 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { safeFormat, isValidDateStr } from "../lib/dateUtils";
 
-const StudentTableCard = ({
-  student,
-  tableSessions,
-  activities,
-  selectedActivityId,
-  toggleAttendanceTable
-}: {
+const StudentTableCard: React.FC<{
   student: Student;
   tableSessions: ClassSession[];
   activities: Activity[];
   selectedActivityId: string;
   toggleAttendanceTable: (sessionId: string, studentId: string) => void;
+}> = ({
+  student,
+  tableSessions,
+  activities,
+  selectedActivityId,
+  toggleAttendanceTable
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   

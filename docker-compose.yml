@@ -6,40 +6,63 @@ services:
     container_name: salsanova_app
     working_dir: /app
     ports:
-      - "3010:3000"  # EXTERNO: 3010 (puedes cambiarlo) | INTERNO: 3000 (no tocar)
+      - "3010:3000"  # EXTERNO: 3010 | INTERNO: 3000
     volumes:
-      - salsanova_data:/app/data
+      # Montado en /data (fuera de /app) para blindar la base de datos contra git reset
+      - salsanova_data_v1_4:/data
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} # Token para el Bot
+      - DATA_DIR=/data
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - APP_URL=https://salsanova.marcogugliandolo.com
+      - SESSION_SECRET=un_secreto_super_seguro_y_aleatorio_2024
+      - GOOGLE_CLIENT_ID=258018738912-fr19rne56bsd93s8q8v1cdk90fovttr1.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
     restart: always
     command: >
       /bin/sh -c "
       echo '--- INICIANDO DESPLIEGUE DANCEFLOW ---' &&
-      
+
       echo '1. Instalando dependencias del sistema...' &&
       apt-get update && apt-get install -y git python3 make g++ sqlite3 &&
-      
-      echo '2. Sincronizando código fuente...' &&
+
+      echo '2. Sincronizando código fuente con resguardo de base de datos...' &&
+      # Si existe base de datos en /app/data o /data, respaldar en /tmp por seguridad absoluta
+      if [ -f /app/data/salsanova.db ]; then
+        cp /app/data/salsanova.db /tmp/salsanova_backup_git.db;
+      elif [ -f /data/salsanova.db ]; then
+        cp /data/salsanova.db /tmp/salsanova_backup_git.db;
+      fi &&
+
       if [ ! -d '.git' ]; then
         git init &&
-        # ¡IMPORTANTE! REEMPLAZA ESTA URL CON LA DE TU NUEVO REPOSITORIO DE GITHUB:
         git remote add origin https://github.com/marcogugliandolo/DanceFlow.git;
       fi &&
       git fetch origin main &&
       git reset --hard origin/main &&
-      
+
+      # Restaurar base de datos si git intentó pisarla
+      if [ -f /tmp/salsanova_backup_git.db ]; then
+        if [ -d /data ]; then
+          cp -n /tmp/salsanova_backup_git.db /data/salsanova.db || true;
+        fi &&
+        if [ -d /app/data ]; then
+          cp -f /tmp/salsanova_backup_git.db /app/data/salsanova.db || true;
+        fi &&
+        rm -f /tmp/salsanova_backup_git.db;
+      fi &&
+
       echo '3. Instalando dependencias de Node...' &&
       npm install --include=dev &&
-      
+
       echo '4. Compilando aplicación...' &&
       npm run build &&
-      
-      echo '5. Iniciando servidor Node (API + Interfaz Vite + Telegram Bot)...' &&
+
+      echo '5. Iniciando servidor Node...' &&
       npm start
       "
 
 volumes:
-  salsanova_data:
+  salsanova_data_v1_4:

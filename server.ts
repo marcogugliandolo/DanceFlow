@@ -17,14 +17,36 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure data directory exists
-const dataDir = path.join(process.cwd(), "data");
+// Ensure data directory exists (supports DATA_DIR env var for Docker volumes)
+const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir);
+  fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Database setup
-const db = new Database(path.join(dataDir, "salsanova.db"));
+// Database setup: persistent SQLite file
+const dbPath = process.env.DB_PATH || path.join(dataDir, "salsanova.db");
+
+// If the persistent volume doesn't have the db yet, but an existing fallback db exists, migrate/copy it over
+if (!fs.existsSync(dbPath)) {
+  const legacyPaths = [
+    path.join(process.cwd(), "data", "salsanova.db"),
+    "/app/data/salsanova.db"
+  ];
+  for (const legacy of legacyPaths) {
+    if (legacy !== dbPath && fs.existsSync(legacy)) {
+      try {
+        fs.copyFileSync(legacy, dbPath);
+        console.log(`[Database] Preserved and copied existing database from ${legacy} to ${dbPath}`);
+        break;
+      } catch (e) {
+        console.error(`[Database] Error copying from ${legacy}:`, e);
+      }
+    }
+  }
+}
+
+const db = new Database(dbPath);
+console.log(`[Database] Connected to SQLite database at: ${dbPath}`);
 
 function getSyncData(userId: string) {
   const activities = db.prepare("SELECT * FROM activities WHERE user_id = ?").all(userId);
