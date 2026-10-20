@@ -1,10 +1,24 @@
 import React, { useState, useMemo } from "react";
 import { Activity, ClassSession, Student } from "../types";
-import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { safeFormat, isValidDateStr } from "../lib/dateUtils";
+
+// Clave de mes "yyyy-MM" a partir de la fecha de la sesión ("yyyy-MM-dd")
+const monthKeyOf = (date: string | undefined | null): string | null => {
+  if (!date) return null;
+  if (/^\d{4}-\d{2}/.test(date)) return date.slice(0, 7);
+  return isValidDateStr(date) ? safeFormat(date, "yyyy-MM") : null;
+};
+
+// "2026-10" -> "Octubre 2026"
+const monthLabel = (key: string): string => {
+  const [year, month] = key.split("-").map(Number);
+  const label = format(new Date(year, month - 1, 1), "MMMM yyyy", { locale: es });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
 
 const StudentTableCard: React.FC<{
   student: Student;
@@ -19,21 +33,49 @@ const StudentTableCard: React.FC<{
   selectedActivityId,
   toggleAttendanceTable
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
+  // Meses que el usuario ha desplegado/plegado a mano
+  const [toggledMonths, setToggledMonths] = useState<Set<string>>(new Set());
+
   // Filter sessions that only belong to activities the student is enrolled in, or if they actually attended
-  const relevantSessions = tableSessions.filter(s => {
+  const relevantSessions = useMemo(() => tableSessions.filter(s => {
     const isEnrolled = student.enrolledActivityIds?.includes(s.activityId);
     const hasAttended = Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id);
     return isEnrolled || hasAttended;
-  });
+  }), [tableSessions, student]);
 
-  const attendedCount = relevantSessions.filter(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id)).length;
+  const isPresentIn = (s: ClassSession) => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(student.id);
+
+  const attendedCount = relevantSessions.filter(isPresentIn).length;
   const totalCount = relevantSessions.length;
   const attendancePercentage = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0;
-  
-  const displaySessions = isExpanded ? relevantSessions : relevantSessions.slice(0, 5);
-  const hasMore = relevantSessions.length > 5;
+
+  // Agrupar las clases por mes (yyyy-MM), del más reciente al más antiguo
+  const monthGroups = useMemo(() => {
+    const groups = new Map<string, ClassSession[]>();
+    for (const s of relevantSessions) {
+      const key = monthKeyOf(s.date);
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(s);
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, monthSessions]) => {
+        const attended = monthSessions.filter(isPresentIn).length;
+        const total = monthSessions.length;
+        return { key, sessions: monthSessions, attended, total, pct: total > 0 ? Math.round((attended / total) * 100) : 0 };
+      });
+  }, [relevantSessions, student.id]);
+
+  // Si solo hay un mes (p. ej. filtrando por mes), se muestra desplegado por defecto
+  const isMonthOpen = (key: string) => monthGroups.length === 1 ? !toggledMonths.has(key) : toggledMonths.has(key);
+  const toggleMonth = (key: string) => {
+    setToggledMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 group">
@@ -60,41 +102,69 @@ const StudentTableCard: React.FC<{
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
-        <div className="flex flex-wrap gap-2.5">
-          {displaySessions.map((session, index) => {
-            const isPresent = Array.isArray(session.attendeeIds) && session.attendeeIds.includes(student.id);
-            const activityName = selectedActivityId === "all" ? activities.find(a => a.id === session.activityId)?.name || 'Clase' : '';
-            const dateStr = safeFormat(session.date, "dd/MM");
-            
-            return (
-              <motion.button
-                initial={isExpanded && index >= 5 ? { opacity: 0, y: -10 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                key={session.id}
-                onClick={() => toggleAttendanceTable(session.id, student.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all shadow-sm active:scale-95 ${
-                  isPresent
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-200/50 dark:ring-emerald-800/50"
-                    : "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/30 dark:text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400 ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
+      <div className="flex-1 flex flex-col gap-1.5">
+        {monthGroups.length === 0 && (
+          <p className="text-xs font-medium text-zinc-400 py-2">Sin clases en este periodo.</p>
+        )}
+        {monthGroups.map(group => {
+          const open = isMonthOpen(group.key);
+          return (
+            <div key={group.key} className="rounded-2xl">
+              <button
+                onClick={() => toggleMonth(group.key)}
+                aria-expanded={open}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                  open ? "bg-zinc-50 dark:bg-zinc-800/60" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
                 }`}
               >
-                {isPresent ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3 h-3 opacity-60" />}
-                <span>{dateStr}</span>
-                {activityName && <span className="opacity-60 max-w-[80px] truncate ml-0.5 font-medium">{activityName}</span>}
-              </motion.button>
-            );
-          })}
-        </div>
-        
-        {hasMore && (
-          <button 
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-4 mt-auto text-[11px] font-bold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center py-2.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl transition-colors w-full"
-          >
-            {isExpanded ? "Ocultar historial" : `Ver ${tableSessions.length - 5} clases más`}
-          </button>
-        )}
+                <ChevronRight className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 w-32 shrink-0 truncate">{monthLabel(group.key)}</span>
+                <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden min-w-[40px]">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${group.pct}%` }} />
+                </div>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 w-12 text-right">
+                  {group.attended}<span className="font-bold opacity-60">/{group.total}</span>
+                </span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-wrap gap-2 px-3 pt-2 pb-3 pl-10">
+                      {group.sessions.map(session => {
+                        const isPresent = isPresentIn(session);
+                        const activityName = selectedActivityId === "all" ? activities.find(a => a.id === session.activityId)?.name || 'Clase' : '';
+                        const dateStr = safeFormat(session.date, "dd/MM");
+                        return (
+                          <button
+                            key={session.id}
+                            onClick={() => toggleAttendanceTable(session.id, student.id)}
+                            title={isPresent ? "Asistió · pulsa para quitar" : "No asistió · pulsa para marcar"}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all shadow-sm active:scale-95 ${
+                              isPresent
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-200/50 dark:ring-emerald-800/50"
+                                : "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/30 dark:text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400 ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
+                            }`}
+                          >
+                            {isPresent ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3 h-3 opacity-60" />}
+                            <span>{dateStr}</span>
+                            {activityName && <span className="opacity-60 max-w-[80px] truncate ml-0.5 font-medium">{activityName}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -116,19 +186,14 @@ export const AttendanceView = ({
   const [viewMode, setViewMode] = useState<"pass" | "table">("pass");
   const [selectedActivityId, setSelectedActivityId] = useState<string>("all");
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const recent = [...sessions]
-      .filter(s => s.status === "held" && isValidDateStr(s.date))
-      .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime())[0];
-    return recent ? safeFormat(recent.date, "yyyy-MM") : safeFormat(new Date(), "yyyy-MM");
-  });
+  // La Relación de Clases agrupa por mes, así que por defecto se muestran todos los meses
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     sessions.forEach(s => {
-      if (isValidDateStr(s.date)) {
-        months.add(safeFormat(s.date, "yyyy-MM"));
-      }
+      const key = monthKeyOf(s.date);
+      if (key) months.add(key);
     });
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [sessions]);
@@ -150,7 +215,7 @@ export const AttendanceView = ({
       s = s.filter(s => s.activityId === selectedActivityId);
     }
     if (selectedMonth !== "all") {
-      s = s.filter(s => isValidDateStr(s.date) && safeFormat(s.date, "yyyy-MM") === selectedMonth);
+      s = s.filter(s => monthKeyOf(s.date) === selectedMonth);
     }
     return s.sort((a, b) => {
       const da = isValidDateStr(a.date) ? new Date(a.date!).getTime() : 0;
@@ -181,7 +246,13 @@ export const AttendanceView = ({
   const markAllStatus = (present: boolean) => {
     if (!selectedSession) return;
     if (present) {
-      editSession(selectedSession.id, { attendeeIds: students.map(s => s.id) });
+      // "Todos" = todos los alumnos inscritos en ESTA clase, conservando a quien ya estuviera marcado
+      // (p. ej. un alumno de otra clase añadido a mano). Nunca marca a alumnos de otras clases.
+      const currentAttendees = Array.isArray(selectedSession.attendeeIds) ? selectedSession.attendeeIds : [];
+      const enrolledIds = students
+        .filter(s => s.enrolledActivityIds?.includes(selectedSession.activityId))
+        .map(s => s.id);
+      editSession(selectedSession.id, { attendeeIds: Array.from(new Set([...currentAttendees, ...enrolledIds])) });
     } else {
       editSession(selectedSession.id, { attendeeIds: [] });
     }
@@ -412,12 +483,10 @@ export const AttendanceView = ({
                 onChange={e => setSelectedMonth(e.target.value)}
                 className="flex-1 w-full lg:w-40 h-10 bg-white dark:bg-zinc-900 px-3 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-800 dark:text-zinc-100 appearance-none shadow-sm cursor-pointer"
               >
-                <option value="all">Meses</option>
-                {availableMonths.map(m => {
-                  const [year, month] = m.split('-');
-                  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-                  return <option key={m} value={m}>{safeFormat(date, "MMM yyyy").charAt(0).toUpperCase() + safeFormat(date, "MMM yyyy").slice(1)}</option>;
-                })}
+                <option value="all">Todos los meses</option>
+                {availableMonths.map(m => (
+                  <option key={m} value={m}>{monthLabel(m)}</option>
+                ))}
               </select>
               <select
                 value={selectedActivityId}
