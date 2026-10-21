@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Activity, ClassSession, Student } from "../types";
-import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon, ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon, ChevronRight, ChevronLeft, Check, Share2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -170,6 +170,349 @@ const StudentTableCard: React.FC<{
   );
 };
 
+// Alumnos de una clase en un periodo: inscritos en la clase o que asistieron a alguna de esas sesiones
+const studentsInClass = (allStudents: Student[], activityId: string, classSessions: ClassSession[]) =>
+  allStudents
+    .filter(st =>
+      st.enrolledActivityIds?.includes(activityId) ||
+      classSessions.some(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(st.id))
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+
+const attendedIn = (s: ClassSession, studentId: string) => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(studentId);
+
+// Relación de Clases por clase: una tarjeta por clase, con sus meses desplegables y los alumnos de cada mes
+const ClassRelationCard: React.FC<{
+  activity: Activity;
+  classSessions: ClassSession[]; // sesiones realizadas de esta clase (ya filtradas por mes si hay filtro)
+  students: Student[];
+  searchQuery: string;
+  onOpenSheet: (month: string) => void;
+}> = ({ activity, classSessions, students, searchQuery, onOpenSheet }) => {
+  const [toggledMonths, setToggledMonths] = useState<Set<string>>(new Set());
+  const q = searchQuery.trim().toLowerCase();
+
+  const months = useMemo(() => {
+    const groups = new Map<string, ClassSession[]>();
+    classSessions.forEach(s => {
+      const k = monthKeyOf(s.date);
+      if (!k) return;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(s);
+    });
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, monthSessions]) => {
+        const allRows = studentsInClass(students, activity.id, monthSessions).map(st => ({
+          student: st,
+          attended: monthSessions.filter(s => attendedIn(s, st.id)).length,
+        }));
+        const present = allRows.reduce((acc, r) => acc + r.attended, 0);
+        const possible = allRows.length * monthSessions.length;
+        const rows = q
+          ? allRows.filter(r => r.student.name.toLowerCase().includes(q) || (r.student.email || "").toLowerCase().includes(q))
+          : allRows;
+        return { key, total: monthSessions.length, rows, pct: possible > 0 ? Math.round((present / possible) * 100) : 0 };
+      })
+      .filter(m => !q || m.rows.length > 0);
+  }, [classSessions, students, activity.id, q]);
+
+  if (months.length === 0) return null;
+
+  // Por defecto se despliega el mes más reciente (o todos si se está buscando un alumno)
+  const isOpen = (key: string, index: number) => (q ? true : index === 0) !== toggledMonths.has(key);
+  const toggle = (key: string) => setToggledMonths(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const totalClasses = months.reduce((acc, m) => acc + m.total, 0);
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md">
+      <div className="mb-3 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+        <h4 className="font-black text-zinc-900 dark:text-white text-lg leading-tight">{activity.name}</h4>
+        <p className="text-xs font-medium text-zinc-500 mt-1 truncate">
+          {activity.location ? `${activity.location} · ` : ""}{totalClasses} {totalClasses === 1 ? "clase" : "clases"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {months.map((m, index) => {
+          const open = isOpen(m.key, index);
+          return (
+            <div key={m.key}>
+              <button
+                onClick={() => toggle(m.key)}
+                aria-expanded={open}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                  open ? "bg-zinc-50 dark:bg-zinc-800/60" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                }`}
+              >
+                <ChevronRight className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+                <span className="flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{monthLabel(m.key)}</span>
+                <span className="text-[11px] font-semibold text-zinc-500 shrink-0">{m.total} {m.total === 1 ? "clase" : "clases"}</span>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 w-10 text-right">{m.pct}%</span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pl-10 pr-3 pt-1 pb-3 flex flex-col">
+                      {m.rows.length === 0 && (
+                        <p className="text-xs font-medium text-zinc-400 py-2">No hay alumnos inscritos.</p>
+                      )}
+                      {m.rows.map(r => {
+                        const pct = m.total > 0 ? Math.round((r.attended / m.total) * 100) : 0;
+                        return (
+                          <div key={r.student.id} className="flex items-center gap-3 py-1.5">
+                            <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-zinc-700 dark:text-zinc-200" title={r.student.name}>{r.student.name}</span>
+                            <div className="w-16 sm:w-24 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden shrink-0">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 w-10 text-right">
+                              {r.attended}<span className="font-bold text-zinc-400">/{m.total}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <button
+                        onClick={() => onOpenSheet(m.key)}
+                        className="self-start mt-2 text-[11px] font-bold text-rose-500 hover:text-rose-600 transition-colors"
+                      >
+                        Ver hoja del mes &rarr;
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ---------- Imagen de la hoja del mes (para compartir) ----------
+// Se dibuja a mano en un canvas: sale siempre igual, sin menús de la app y sin depender de librerías.
+type SheetImageData = {
+  activityName: string;
+  location?: string;
+  monthLabel: string;
+  teacherName?: string;
+  days: { weekday: string; day: string }[];
+  rows: { name: string; marks: boolean[]; count: number }[];
+  perDay: number[];
+  totalPresent: number;
+  pct: number;
+};
+
+const IMG_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+const fillRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fill();
+};
+
+const fitText = (ctx: CanvasRenderingContext2D, text: string, maxW: number) => {
+  if (ctx.measureText(text).width <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
+};
+
+const renderSheetImage = (d: SheetImageData): HTMLCanvasElement => {
+  const scale = 2;
+  const pad = 36, cell = 34, rowH = 38, totalW = 60, nameGap = 18;
+  const m = document.createElement("canvas").getContext("2d")!;
+  m.font = `600 15px ${IMG_FONT}`;
+  const nameW = Math.min(280, Math.max(110, ...d.rows.map(r => m.measureText(r.name).width)));
+  const tableW = nameW + nameGap + d.days.length * cell + totalW;
+  m.font = `800 28px ${IMG_FONT}`;
+  const titleW = Math.min(m.measureText(d.activityName).width, 900);
+  const W = Math.ceil(Math.max(tableW, titleW, 440) + pad * 2);
+  const headerH = 22 + 38 + (d.location ? 24 : 0) + 34 + 22;
+  const H = Math.ceil(pad + headerH + 46 + d.rows.length * rowH + 46 + 36 + pad);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = "alphabetic";
+
+  // Cabecera
+  let y = pad + 12;
+  ctx.fillStyle = "#e11d48";
+  ctx.font = `800 12px ${IMG_FONT}`;
+  ctx.fillText(`ASISTENCIA · ${d.monthLabel.toUpperCase()}`, pad, y);
+  y += 36;
+  ctx.fillStyle = "#18181b";
+  ctx.font = `800 28px ${IMG_FONT}`;
+  ctx.fillText(fitText(ctx, d.activityName, W - pad * 2), pad, y);
+  if (d.location) {
+    y += 24;
+    ctx.fillStyle = "#71717a";
+    ctx.font = `500 15px ${IMG_FONT}`;
+    ctx.fillText(fitText(ctx, d.location, W - pad * 2), pad, y);
+  }
+  y += 32;
+  ctx.fillStyle = "#3f3f46";
+  ctx.font = `700 14px ${IMG_FONT}`;
+  const n = d.days.length;
+  ctx.fillText(`${n} ${n === 1 ? "clase" : "clases"} · ${d.rows.length} ${d.rows.length === 1 ? "alumno" : "alumnos"} · ${d.pct}% asistencia`, pad, y);
+  y += 22;
+  ctx.fillStyle = "#e4e4e7";
+  ctx.fillRect(pad, y, W - pad * 2, 1);
+
+  // Columnas
+  const xName = pad;
+  const xDays = pad + nameW + nameGap;
+  const xTotalRight = xDays + n * cell + totalW;
+  const colCenter = (i: number) => xDays + i * cell + cell / 2;
+
+  // Cabecera de la tabla
+  y += 22;
+  ctx.fillStyle = "#a1a1aa";
+  ctx.font = `700 11px ${IMG_FONT}`;
+  ctx.textAlign = "left";
+  ctx.fillText("ALUMNO", xName, y + 16);
+  ctx.textAlign = "right";
+  ctx.fillText("TOTAL", xTotalRight, y + 16);
+  ctx.textAlign = "center";
+  d.days.forEach((dd, i) => {
+    ctx.fillStyle = "#a1a1aa";
+    ctx.font = `700 10px ${IMG_FONT}`;
+    ctx.fillText(dd.weekday.toUpperCase(), colCenter(i), y + 2);
+    ctx.fillStyle = "#18181b";
+    ctx.font = `800 15px ${IMG_FONT}`;
+    ctx.fillText(dd.day, colCenter(i), y + 18);
+  });
+  y += 26;
+
+  // Filas de alumnos
+  d.rows.forEach(r => {
+    ctx.fillStyle = "#f4f4f5";
+    ctx.fillRect(pad, y, xTotalRight - pad, 1);
+    const mid = y + rowH / 2;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#27272a";
+    ctx.font = `600 15px ${IMG_FONT}`;
+    ctx.fillText(fitText(ctx, r.name, nameW), xName, mid + 5);
+    r.marks.forEach((present, i) => {
+      const bx = colCenter(i) - 12, by = mid - 12;
+      ctx.fillStyle = present ? "#10b981" : "#f4f4f5";
+      fillRoundRect(ctx, bx, by, 24, 24, 6);
+      if (present) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(bx + 7, by + 12.5);
+        ctx.lineTo(bx + 10.5, by + 16);
+        ctx.lineTo(bx + 17.5, by + 8.5);
+        ctx.stroke();
+      }
+    });
+    ctx.textAlign = "right";
+    ctx.font = `700 14px ${IMG_FONT}`;
+    ctx.fillStyle = "#a1a1aa";
+    const rest = `/${n}`;
+    ctx.fillText(rest, xTotalRight, mid + 5);
+    const restW = ctx.measureText(rest).width; // medido con la fuente de "/n"
+    ctx.fillStyle = "#059669";
+    ctx.font = `800 14px ${IMG_FONT}`;
+    ctx.fillText(String(r.count), xTotalRight - restW, mid + 5);
+    y += rowH;
+  });
+
+  // Fila de asistentes por día
+  ctx.fillStyle = "#d4d4d8";
+  ctx.fillRect(pad, y, xTotalRight - pad, 2);
+  y += 28;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#a1a1aa";
+  ctx.font = `700 11px ${IMG_FONT}`;
+  ctx.fillText("ASISTENTES", xName, y);
+  ctx.fillStyle = "#18181b";
+  ctx.font = `800 14px ${IMG_FONT}`;
+  ctx.textAlign = "center";
+  d.perDay.forEach((c, i) => ctx.fillText(String(c), colCenter(i), y));
+  ctx.textAlign = "right";
+  ctx.fillText(String(d.totalPresent), xTotalRight, y);
+
+  // Pie
+  y += 36;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#a1a1aa";
+  ctx.font = `500 11px ${IMG_FONT}`;
+  const credit = ["SalsaNova", d.teacherName, `generado el ${format(new Date(), "dd/MM/yyyy")}`].filter(Boolean).join(" · ");
+  ctx.fillText(credit, pad, y);
+
+  // Recortar el espacio sobrante de abajo
+  const finalH = Math.ceil(y + pad - 8);
+  if (finalH < H) {
+    const cropped = document.createElement("canvas");
+    cropped.width = W * scale;
+    cropped.height = finalH * scale;
+    cropped.getContext("2d")!.drawImage(canvas, 0, 0);
+    return cropped;
+  }
+  return canvas;
+};
+
+const canShareImages = (() => {
+  try {
+    const nav = navigator as any;
+    return !!(nav.canShare && nav.canShare({ files: [new File([new Uint8Array(1)], "x.png", { type: "image/png" })] }));
+  } catch {
+    return false;
+  }
+})();
+
+// Abre el menú de compartir del móvil con la imagen; si no se puede, la descarga.
+// Ojo: todo hasta navigator.share es síncrono para no perder el "toque" del usuario (Safari lo exige).
+const shareSheetImage = async (d: SheetImageData, fileName: string): Promise<"shared" | "cancelled" | "downloaded"> => {
+  const dataUrl = renderSheetImage(d).toDataURL("image/png");
+  const nav = navigator as any;
+  if (canShareImages) {
+    const bin = atob(dataUrl.split(",")[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const file = new File([bytes], fileName, { type: "image/png" });
+    try {
+      await nav.share({ files: [file], title: fileName.replace(/\.png$/, "") });
+      return "shared";
+    } catch (e: any) {
+      if (e?.name === "AbortError") return "cancelled";
+      // Si el navegador lo rechaza por otro motivo, se descarga
+    }
+  }
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return "downloaded";
+};
+
 // Selector de mes con flechas (anterior / siguiente)
 const MonthStepper: React.FC<{ label: string; onPrev?: () => void; onNext?: () => void }> = ({ label, onPrev, onNext }) => (
   <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl w-full sm:w-auto">
@@ -197,12 +540,14 @@ export const AttendanceView = ({
   activities,
   sessions,
   students,
-  editSession
+  editSession,
+  teacherName
 }: {
   activities: Activity[];
   sessions: ClassSession[];
   students: Student[];
   editSession: (id: string, updates: Partial<ClassSession>) => void;
+  teacherName?: string;
 }) => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -240,16 +585,15 @@ export const AttendanceView = ({
   });
 
   // Hoja mensual abierta (clase + mes)
-  const [sheet, setSheet] = useState<{ activityId: string; month: string } | null>(null);
+  const [sheet, setSheet] = useState<{ activityId: string; month: string; from?: "table" } | null>(null);
 
   // Alumnos que salen en la hoja de una clase/mes: inscritos en la clase o que asistieron algún día de ese mes
   const studentsForSheet = (activityId: string, monthSessions: ClassSession[]) =>
-    students
-      .filter(st =>
-        st.enrolledActivityIds?.includes(activityId) ||
-        monthSessions.some(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(st.id))
-      )
-      .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    studentsInClass(students, activityId, monthSessions);
+
+  // Relación de Clases: por clase (por defecto) o por alumno
+  const [relationBy, setRelationBy] = useState<"clase" | "alumno">("clase");
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const sortByDate = (a: ClassSession, b: ClassSession) => {
     const byDate = (a.date || "").localeCompare(b.date || "");
@@ -549,10 +893,10 @@ export const AttendanceView = ({
       <div className="flex flex-col gap-5 max-w-5xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
-            onClick={() => { setPassMonth(sheet.month); setSheet(null); }}
+            onClick={() => { setPassMonth(sheet.month); if (sheet.from === "table") setViewMode("table"); setSheet(null); }}
             className="self-start text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
           >
-            &larr; Volver a clases
+            &larr; {sheet.from === "table" ? "Volver a Relación de Clases" : "Volver a clases"}
           </button>
           <MonthStepper
             label={monthLabel(sheet.month)}
@@ -562,7 +906,8 @@ export const AttendanceView = ({
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-white/5 rounded-3xl p-4 sm:p-5 md:p-8 shadow-sm">
-          <div className="mb-5 pb-5 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="mb-5 pb-5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wider text-rose-500 mb-1">Asistencia · {monthLabel(sheet.month)}</p>
             <h2 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight">{sheetActivity.name}</h2>
             {sheetActivity.location && <p className="text-sm text-zinc-500 font-medium mt-1">{sheetActivity.location}</p>}
@@ -577,6 +922,41 @@ export const AttendanceView = ({
                 <CheckCircle2 className="w-3.5 h-3.5" /> {pct}% asistencia
               </span>
             </div>
+          </div>
+          {sheetSessions.length > 0 && rows.length > 0 && (
+            <div className="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
+              <button
+                onClick={async () => {
+                  const result = await shareSheetImage(
+                    {
+                      activityName: sheetActivity.name,
+                      location: sheetActivity.location,
+                      monthLabel: monthLabel(sheet.month),
+                      teacherName,
+                      days: sheetSessions.map(s => ({ weekday: safeFormat(s.date, "EEEEEE"), day: safeFormat(s.date, "dd") })),
+                      rows: rows.map(st => ({
+                        name: st.name,
+                        marks: sheetSessions.map(s => isIn(s, st.id)),
+                        count: sheetSessions.filter(s => isIn(s, st.id)).length,
+                      })),
+                      perDay: sheetSessions.map(s => rows.filter(st => isIn(s, st.id)).length),
+                      totalPresent,
+                      pct,
+                    },
+                    `Asistencia ${sheetActivity.name} - ${monthLabel(sheet.month)}.png`.replace(/[\\/:*?"<>|]/g, "-")
+                  );
+                  if (result === "downloaded") {
+                    setShareMsg("Imagen descargada");
+                    setTimeout(() => setShareMsg(null), 2500);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-900 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm"
+              >
+                <Share2 className="w-4 h-4" /> {canShareImages ? "Compartir" : "Descargar imagen"}
+              </button>
+              {shareMsg && <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 text-center sm:text-right">{shareMsg}</span>}
+            </div>
+          )}
           </div>
 
           {sheetSessions.length === 0 ? (
@@ -845,24 +1225,86 @@ export const AttendanceView = ({
               <p className="text-center font-medium">No hay historial de clases para mostrar.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-              {filteredStudents.length === 0 && (
-                <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
-                  <Search className="w-12 h-12 mb-4 opacity-30" />
-                  <p className="text-center font-medium">No se encontraron alumnos.</p>
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold text-zinc-500">Ver por:</span>
+                <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg">
+                  {(["clase", "alumno"] as const).map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setRelationBy(v)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                        relationBy === v
+                          ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                      }`}
+                    >
+                      {v === "clase" ? "Clase" : "Alumno"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {relationBy === "clase" ? (() => {
+                const q = searchQuery.trim().toLowerCase();
+                const groups = Array.from(
+                  tableSessions.reduce((map, s) => {
+                    if (!map.has(s.activityId)) map.set(s.activityId, []);
+                    map.get(s.activityId)!.push(s);
+                    return map;
+                  }, new Map<string, ClassSession[]>())
+                )
+                  .map(([activityId, classSessions]) => ({ activity: activities.find(a => a.id === activityId), classSessions }))
+                  .filter((g): g is { activity: Activity; classSessions: ClassSession[] } => !!g.activity)
+                  .filter(g => !q || studentsInClass(students, g.activity.id, g.classSessions)
+                    .some(st => st.name.toLowerCase().includes(q) || (st.email || "").toLowerCase().includes(q)))
+                  .sort((a, b) => a.activity.name.localeCompare(b.activity.name, "es"));
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 items-start">
+                    {groups.length === 0 && (
+                      <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
+                        <Search className="w-12 h-12 mb-4 opacity-30" />
+                        <p className="text-center font-medium">No se encontraron alumnos.</p>
+                      </div>
+                    )}
+                    {groups.map(g => (
+                      <ClassRelationCard
+                        key={g.activity.id}
+                        activity={g.activity}
+                        classSessions={g.classSessions}
+                        students={students}
+                        searchQuery={searchQuery}
+                        onOpenSheet={(month) => {
+                          setPassMonth(month);
+                          setSheet({ activityId: g.activity.id, month, from: "table" });
+                          setViewMode("pass");
+                        }}
+                      />
+                    ))}
+                  </div>
+                );
+              })() : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+                  {filteredStudents.length === 0 && (
+                    <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
+                      <Search className="w-12 h-12 mb-4 opacity-30" />
+                      <p className="text-center font-medium">No se encontraron alumnos.</p>
+                    </div>
+                  )}
+                  {filteredStudents.map(student => (
+                    <StudentTableCard
+                      key={student.id}
+                      student={student}
+                      tableSessions={tableSessions}
+                      activities={activities}
+                      selectedActivityId={selectedActivityId}
+                      toggleAttendanceTable={toggleAttendanceTable}
+                    />
+                  ))}
                 </div>
               )}
-              {filteredStudents.map(student => (
-                <StudentTableCard 
-                  key={student.id}
-                  student={student}
-                  tableSessions={tableSessions}
-                  activities={activities}
-                  selectedActivityId={selectedActivityId}
-                  toggleAttendanceTable={toggleAttendanceTable}
-                />
-              ))}
-            </div>
+            </>
           )}
         </div>
       )}

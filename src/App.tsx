@@ -2948,8 +2948,9 @@ export default function App() {
               <AttendanceView 
                 activities={activities} 
                 sessions={sessions} 
-                students={students} 
-                editSession={editSession} 
+                students={students}
+                editSession={editSession}
+                teacherName={adminUserName || profile.name}
               />
             </motion.div>
           ) : activeTab === "historial" ? (
