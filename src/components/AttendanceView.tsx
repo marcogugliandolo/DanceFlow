@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Activity, ClassSession, Student } from "../types";
-import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, Search, Calendar as CalendarIcon, Users, Table as TableIcon, List as ListIcon, ChevronRight, ChevronLeft, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -170,6 +170,29 @@ const StudentTableCard: React.FC<{
   );
 };
 
+// Selector de mes con flechas (anterior / siguiente)
+const MonthStepper: React.FC<{ label: string; onPrev?: () => void; onNext?: () => void }> = ({ label, onPrev, onNext }) => (
+  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl w-full sm:w-auto">
+    <button
+      onClick={onPrev}
+      disabled={!onPrev}
+      aria-label="Mes anterior"
+      className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+    >
+      <ChevronLeft className="w-4 h-4" />
+    </button>
+    <span className="flex-1 sm:w-40 text-center text-sm font-bold text-zinc-900 dark:text-white">{label}</span>
+    <button
+      onClick={onNext}
+      disabled={!onNext}
+      aria-label="Mes siguiente"
+      className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+    >
+      <ChevronRight className="w-4 h-4" />
+    </button>
+  </div>
+);
+
 export const AttendanceView = ({
   activities,
   sessions,
@@ -198,16 +221,87 @@ export const AttendanceView = ({
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [sessions]);
 
-  const recentSessions = useMemo(() => {
-    return [...sessions]
-      .filter(s => !s.attendanceCompleted && s.status === "held")
-      .sort((a, b) => {
-        const da = isValidDateStr(a.date) ? new Date(a.date!).getTime() : 0;
-        const db = isValidDateStr(b.date) ? new Date(b.date!).getTime() : 0;
-        return db - da;
+  // ---------- Pasar Lista: una tarjeta por clase y mes ----------
+  const heldSessions = useMemo(() => sessions.filter(s => s.status === "held"), [sessions]);
+  const todayKey = format(new Date(), "yyyy-MM");
+
+  // Meses navegables en Pasar Lista: los que tienen clases realizadas + el mes actual
+  const passMonths = useMemo(() => {
+    const months = new Set<string>([todayKey]);
+    heldSessions.forEach(s => { const k = monthKeyOf(s.date); if (k) months.add(k); });
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [heldSessions, todayKey]);
+
+  const [passMonth, setPassMonth] = useState<string>(() => {
+    const months = Array.from(new Set(sessions.filter(s => s.status === "held").map(s => monthKeyOf(s.date)).filter(Boolean) as string[]))
+      .sort((a, b) => b.localeCompare(a));
+    if (months.includes(todayKey)) return todayKey;
+    return months.find(m => m <= todayKey) ?? months[0] ?? todayKey;
+  });
+
+  // Hoja mensual abierta (clase + mes)
+  const [sheet, setSheet] = useState<{ activityId: string; month: string } | null>(null);
+
+  // Alumnos que salen en la hoja de una clase/mes: inscritos en la clase o que asistieron algún día de ese mes
+  const studentsForSheet = (activityId: string, monthSessions: ClassSession[]) =>
+    students
+      .filter(st =>
+        st.enrolledActivityIds?.includes(activityId) ||
+        monthSessions.some(s => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(st.id))
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+
+  const sortByDate = (a: ClassSession, b: ClassSession) => {
+    const byDate = (a.date || "").localeCompare(b.date || "");
+    return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
+  };
+
+  const monthCards = useMemo(() => {
+    const byActivity = new Map<string, ClassSession[]>();
+    heldSessions.forEach(s => {
+      if (monthKeyOf(s.date) !== passMonth) return;
+      if (!byActivity.has(s.activityId)) byActivity.set(s.activityId, []);
+      byActivity.get(s.activityId)!.push(s);
+    });
+    return Array.from(byActivity.entries())
+      .map(([activityId, monthSessions]) => {
+        const activity = activities.find(a => a.id === activityId);
+        if (!activity) return null;
+        const sorted = [...monthSessions].sort(sortByDate);
+        const rows = studentsForSheet(activityId, sorted);
+        const present = sorted.reduce((acc, s) => acc + rows.filter(st => s.attendeeIds?.includes(st.id)).length, 0);
+        const possible = rows.length * sorted.length;
+        return {
+          activity,
+          sessions: sorted,
+          studentCount: rows.length,
+          pct: possible > 0 ? Math.round((present / possible) * 100) : 0,
+          pending: sorted.filter(s => !s.attendanceCompleted),
+        };
       })
-      .slice(0, 30); // show last 30 sessions
-  }, [sessions]);
+      .filter(Boolean)
+      .sort((a, b) => a!.activity.name.localeCompare(b!.activity.name, "es")) as {
+        activity: Activity; sessions: ClassSession[]; studentCount: number; pct: number; pending: ClassSession[];
+      }[];
+  }, [heldSessions, passMonth, activities, students]);
+
+  // Clases pendientes de pasar lista en otros meses (para no perderlas de vista)
+  const pendingOtherMonths = useMemo(() => {
+    const counts = new Map<string, number>();
+    heldSessions.forEach(s => {
+      const k = monthKeyOf(s.date);
+      if (!k || k === passMonth || s.attendanceCompleted || !activities.some(a => a.id === s.activityId)) return;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [heldSessions, passMonth, activities]);
+
+  const shiftMonth = (list: string[], current: string, dir: -1 | 1) => {
+    // list está ordenada de más reciente a más antiguo: "anterior" = índice + 1
+    const i = list.indexOf(current);
+    const next = list[i - dir];
+    return next ?? null;
+  };
 
   const tableSessions = useMemo(() => {
     let s = [...sessions].filter(s => s.status === "held");
@@ -304,10 +398,10 @@ export const AttendanceView = ({
     return (
       <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
         <button 
-          onClick={() => setSelectedSessionId(null)} 
+          onClick={() => setSelectedSessionId(null)}
           className="self-start text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
         >
-          &larr; Volver a clases
+          &larr; {sheet ? `Volver a ${monthLabel(sheet.month).toLowerCase()}` : "Volver a clases"}
         </button>
 
         <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-3xl p-6 md:p-8 shadow-sm">
@@ -427,6 +521,161 @@ export const AttendanceView = ({
     );
   }
 
+  // ---------- Hoja mensual de una clase (alumnos × días) ----------
+  const sheetActivity = sheet ? activities.find(a => a.id === sheet.activityId) : undefined;
+  if (viewMode === "pass" && sheet && sheetActivity) {
+    const sheetSessions = heldSessions
+      .filter(s => s.activityId === sheet.activityId && monthKeyOf(s.date) === sheet.month)
+      .sort(sortByDate);
+    const rows = studentsForSheet(sheet.activityId, sheetSessions);
+    const isIn = (s: ClassSession, studentId: string) => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(studentId);
+    const totalPresent = sheetSessions.reduce((acc, s) => acc + rows.filter(st => isIn(s, st.id)).length, 0);
+    const possible = rows.length * sheetSessions.length;
+    const pct = possible > 0 ? Math.round((totalPresent / possible) * 100) : 0;
+    const hasPending = sheetSessions.some(s => !s.attendanceCompleted);
+
+    const activityMonths = Array.from(new Set(
+      heldSessions.filter(s => s.activityId === sheet.activityId).map(s => monthKeyOf(s.date)).filter(Boolean) as string[]
+    )).sort((a, b) => b.localeCompare(a));
+    const prevMonth = shiftMonth(activityMonths, sheet.month, -1);
+    const nextMonth = shiftMonth(activityMonths, sheet.month, 1);
+
+    const cellBorder = "border-t border-zinc-100 dark:border-zinc-800";
+    const deskBorder = "sm:border-t sm:border-zinc-100 sm:dark:border-zinc-800";
+    const deskFootBorder = "sm:border-t-2 sm:border-zinc-200 sm:dark:border-zinc-700";
+    const stickyCell = "sticky left-0 z-10 bg-white dark:bg-zinc-900";
+
+    return (
+      <div className="flex flex-col gap-5 max-w-5xl mx-auto w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <button
+            onClick={() => { setPassMonth(sheet.month); setSheet(null); }}
+            className="self-start text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
+          >
+            &larr; Volver a clases
+          </button>
+          <MonthStepper
+            label={monthLabel(sheet.month)}
+            onPrev={prevMonth ? () => setSheet({ ...sheet, month: prevMonth }) : undefined}
+            onNext={nextMonth ? () => setSheet({ ...sheet, month: nextMonth }) : undefined}
+          />
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-white/5 rounded-3xl p-4 sm:p-5 md:p-8 shadow-sm">
+          <div className="mb-5 pb-5 border-b border-zinc-200 dark:border-zinc-800">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-500 mb-1">Asistencia · {monthLabel(sheet.month)}</p>
+            <h2 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight">{sheetActivity.name}</h2>
+            {sheetActivity.location && <p className="text-sm text-zinc-500 font-medium mt-1">{sheetActivity.location}</p>}
+            <div className="flex flex-wrap gap-2 mt-4 text-xs font-bold">
+              <span className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2.5 py-1 rounded-lg">
+                <CalendarIcon className="w-3.5 h-3.5" /> {sheetSessions.length} {sheetSessions.length === 1 ? "clase" : "clases"}
+              </span>
+              <span className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2.5 py-1 rounded-lg">
+                <Users className="w-3.5 h-3.5" /> {rows.length} {rows.length === 1 ? "alumno" : "alumnos"}
+              </span>
+              <span className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {pct}% asistencia
+              </span>
+            </div>
+          </div>
+
+          {sheetSessions.length === 0 ? (
+            <p className="text-center py-10 text-zinc-500 font-medium">No hay clases realizadas este mes.</p>
+          ) : rows.length === 0 ? (
+            <p className="text-center py-10 text-zinc-500 font-medium">No hay alumnos inscritos en esta clase.</p>
+          ) : (
+            // En móvil el nombre va en su propia fila, encima de las casillas, para que la hoja
+            // quepa entera en vertical y se pueda hacer captura. En pantallas grandes, nombre a la izquierda.
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr>
+                    <th className={`${stickyCell} hidden sm:table-cell w-full text-left align-bottom pb-2 pr-3 text-[11px] font-bold uppercase tracking-wider text-zinc-400`}>Alumno</th>
+                    {sheetSessions.map(s => (
+                      <th key={s.id} className="pb-2 px-px sm:px-0.5 font-normal align-bottom">
+                        <button
+                          onClick={() => setSelectedSessionId(s.id)}
+                          title="Pasar lista de este día"
+                          className="relative w-7 sm:w-8 mx-auto flex flex-col items-center rounded-lg py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase text-zinc-400 leading-none mb-0.5">{safeFormat(s.date, "EEEEEE")}</span>
+                          <span className="text-sm font-black text-zinc-800 dark:text-zinc-100 tabular-nums leading-none">{safeFormat(s.date, "dd")}</span>
+                          {!s.attendanceCompleted && <span className="absolute top-0 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                        </button>
+                      </th>
+                    ))}
+                    <th className="pb-2 pl-2 sm:pl-3 text-right align-bottom text-[11px] font-bold uppercase tracking-wider text-zinc-400">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(st => {
+                    const count = sheetSessions.filter(s => isIn(s, st.id)).length;
+                    return (
+                      <React.Fragment key={st.id}>
+                        <tr className="sm:hidden">
+                          <td colSpan={sheetSessions.length + 1} className={`${cellBorder} pt-2 pb-0.5 text-[13px] font-semibold text-zinc-800 dark:text-zinc-100`}>
+                            {st.name}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className={`${stickyCell} ${deskBorder} hidden sm:table-cell py-1.5 pr-3`}>
+                            <div className="max-w-[420px] truncate font-semibold text-zinc-800 dark:text-zinc-100" title={st.name}>{st.name}</div>
+                          </td>
+                          {sheetSessions.map(s => {
+                            const present = isIn(s, st.id);
+                            return (
+                              <td key={s.id} className={`${deskBorder} pb-2 sm:py-1.5 px-px sm:px-0.5 text-center`}>
+                                <button
+                                  onClick={() => toggleAttendanceTable(s.id, st.id)}
+                                  aria-label={`${st.name}, ${safeFormat(s.date, "dd/MM")}: ${present ? "asistió" : "no asistió"}`}
+                                  className={`w-6 h-6 sm:w-7 sm:h-7 mx-auto flex items-center justify-center rounded-md sm:rounded-lg transition-colors ${
+                                    present
+                                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                                      : "bg-zinc-100 dark:bg-zinc-800 text-transparent hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                                  }`}
+                                >
+                                  <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={3} />
+                                </button>
+                              </td>
+                            );
+                          })}
+                          <td className={`${deskBorder} pb-2 sm:py-1.5 pl-2 sm:pl-3 text-right tabular-nums whitespace-nowrap font-black text-emerald-600 dark:text-emerald-400`}>
+                            {count}<span className="font-bold text-zinc-400">/{sheetSessions.length}</span>
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="sm:hidden">
+                    <td colSpan={sheetSessions.length + 1} className="pt-2.5 border-t-2 border-zinc-200 dark:border-zinc-700 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Asistentes</td>
+                  </tr>
+                  <tr>
+                    <td className={`${stickyCell} hidden sm:table-cell pt-2.5 pr-3 border-t-2 border-zinc-200 dark:border-zinc-700 text-[11px] font-bold uppercase tracking-wider text-zinc-400`}>Asistentes</td>
+                    {sheetSessions.map(s => (
+                      <td key={s.id} className={`pt-1 sm:pt-2.5 ${deskFootBorder} text-center font-black tabular-nums text-zinc-800 dark:text-zinc-100`}>
+                        {rows.filter(st => isIn(s, st.id)).length}
+                      </td>
+                    ))}
+                    <td className={`pt-1 sm:pt-2.5 pl-2 sm:pl-3 ${deskFootBorder} text-right font-black tabular-nums text-zinc-800 dark:text-zinc-100`}>{totalPresent}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {sheetSessions.length > 0 && rows.length > 0 && (
+            <p className="mt-5 text-[11px] text-zinc-400 font-medium leading-relaxed">
+              Toca un día para pasar lista con «Todos» o «Ninguno», o una casilla para cambiarla.
+              {hasPending && <> <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 align-middle mx-0.5" /> lista sin finalizar.</>}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2">
@@ -464,6 +713,14 @@ export const AttendanceView = ({
             <TableIcon className="w-4 h-4" /> Relación de Clases
           </button>
         </div>
+
+        {viewMode === "pass" && (
+          <MonthStepper
+            label={monthLabel(passMonth)}
+            onPrev={shiftMonth(passMonths, passMonth, -1) ? () => setPassMonth(shiftMonth(passMonths, passMonth, -1)!) : undefined}
+            onNext={shiftMonth(passMonths, passMonth, 1) ? () => setPassMonth(shiftMonth(passMonths, passMonth, 1)!) : undefined}
+          />
+        )}
 
         {viewMode === "table" && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto lg:justify-end">
@@ -504,60 +761,79 @@ export const AttendanceView = ({
       </div>
 
       {viewMode === "pass" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-          {recentSessions.map(session => {
-            const activity = activities.find(a => a.id === session.activityId);
-            if (!activity) return null;
-            
-            const attendees = Array.isArray(session.attendeeIds) ? session.attendeeIds : [];
-            const associatedCount = students.filter(s => s.enrolledActivityIds?.includes(session.activityId) || attendees.includes(s.id)).length;
-            const percentage = associatedCount > 0 ? Math.round((attendees.length / associatedCount) * 100) : 0;
-            const safePercentage = isNaN(percentage) ? 0 : percentage;
-            
-            return (
-              <button
-                key={session.id}
-                onClick={() => setSelectedSessionId(session.id)}
-                className="group relative flex flex-col items-start p-5 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/5 shadow-sm rounded-3xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-all text-left overflow-hidden hover:shadow-md active:scale-[0.98]"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent dark:from-emerald-500/5 rounded-bl-[100px] -z-10 group-hover:scale-110 transition-transform" />
-                
-                <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  {safeFormat(session.date, "dd/MM/yyyy")}
-                </div>
-                
-                <h3 className="text-xl font-black text-zinc-900 dark:text-white mb-4 line-clamp-1">
-                  {activity.name}
-                </h3>
-                
-                <div className="w-full mt-auto">
-                  <div className="flex justify-between items-end mb-2">
-                    <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      <span className="text-2xl font-black text-emerald-500">{attendees.length}</span>
-                      <span className="opacity-60"> / {associatedCount} asist.</span>
-                    </div>
-                    <div className="text-xs font-bold opacity-60">{safePercentage || 0}%</div>
-                  </div>
-                  
-                  <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" 
-                      style={{ width: `${safePercentage || 0}%` }}
-                    />
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-          
-          {recentSessions.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
-              <CheckCircle2 className="w-12 h-12 mb-4 text-emerald-500/50" />
-              <p className="text-center font-medium">No hay clases recientes pendientes de pasar lista.</p>
-              <p className="text-sm opacity-70 mt-1">¡Todo al día!</p>
+        <div className="flex flex-col gap-4 mt-2">
+          {pendingOtherMonths.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-500">
+              <span>Pendientes de pasar lista en:</span>
+              {pendingOtherMonths.map(([m, n]) => (
+                <button
+                  key={m}
+                  onClick={() => setPassMonth(m)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/25 font-bold transition-colors"
+                >
+                  {monthLabel(m)} · {n}
+                </button>
+              ))}
             </div>
           )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {monthCards.map(card => (
+              <div
+                key={card.activity.id}
+                className="group relative flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/5 shadow-sm rounded-3xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-all overflow-hidden hover:shadow-md"
+              >
+                <button
+                  onClick={() => setSheet({ activityId: card.activity.id, month: passMonth })}
+                  className="flex flex-col items-start p-5 pb-4 text-left w-full active:scale-[0.99] transition-transform"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent dark:from-emerald-500/5 rounded-bl-[100px] -z-10 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    {monthLabel(passMonth)}
+                  </div>
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white line-clamp-2 leading-tight">
+                    {card.activity.name}
+                  </h3>
+                  {card.activity.location && (
+                    <p className="text-xs font-medium text-zinc-500 mt-1 truncate max-w-full">{card.activity.location}</p>
+                  )}
+                  <div className="w-full mt-4">
+                    <div className="flex justify-between items-end mb-2">
+                      <div className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                        {card.sessions.length} {card.sessions.length === 1 ? "clase" : "clases"} · {card.studentCount} {card.studentCount === 1 ? "alumno" : "alumnos"}
+                      </div>
+                      <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{card.pct}%</div>
+                    </div>
+                    <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${card.pct}%` }} />
+                    </div>
+                  </div>
+                </button>
+                {card.pending.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 px-5 pb-4 -mt-1">
+                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mr-0.5">Pasar lista:</span>
+                    {card.pending.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSheet({ activityId: card.activity.id, month: passMonth }); setSelectedSessionId(s.id); }}
+                        className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/25 transition-colors"
+                      >
+                        {safeFormat(s.date, "dd/MM")}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {monthCards.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
+                <CalendarIcon className="w-12 h-12 mb-4 text-emerald-500/50" />
+                <p className="text-center font-medium">No hay clases realizadas en {monthLabel(passMonth).toLowerCase()}.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
