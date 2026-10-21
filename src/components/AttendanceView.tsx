@@ -181,122 +181,341 @@ const studentsInClass = (allStudents: Student[], activityId: string, classSessio
 
 const attendedIn = (s: ClassSession, studentId: string) => Array.isArray(s.attendeeIds) && s.attendeeIds.includes(studentId);
 
-// Relación de Clases por clase: una tarjeta por clase, con sus meses desplegables y los alumnos de cada mes
-const ClassRelationCard: React.FC<{
-  activity: Activity;
-  classSessions: ClassSession[]; // sesiones realizadas de esta clase (ya filtradas por mes si hay filtro)
-  students: Student[];
-  searchQuery: string;
-  onOpenSheet: (month: string) => void;
-}> = ({ activity, classSessions, students, searchQuery, onOpenSheet }) => {
-  const [toggledMonths, setToggledMonths] = useState<Set<string>>(new Set());
-  const q = searchQuery.trim().toLowerCase();
+// ---------- Relación de Clases por clase ----------
+type MonthStat = {
+  key: string;
+  sessions: ClassSession[]; // ordenadas por fecha
+  rows: { student: Student; marks: boolean[]; attended: number }[];
+  pct: number;
+};
 
-  const months = useMemo(() => {
-    const groups = new Map<string, ClassSession[]>();
-    classSessions.forEach(s => {
-      const k = monthKeyOf(s.date);
-      if (!k) return;
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k)!.push(s);
-    });
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([key, monthSessions]) => {
-        const allRows = studentsInClass(students, activity.id, monthSessions).map(st => ({
-          student: st,
-          attended: monthSessions.filter(s => attendedIn(s, st.id)).length,
-        }));
-        const present = allRows.reduce((acc, r) => acc + r.attended, 0);
-        const possible = allRows.length * monthSessions.length;
-        const rows = q
-          ? allRows.filter(r => r.student.name.toLowerCase().includes(q) || (r.student.email || "").toLowerCase().includes(q))
-          : allRows;
-        return { key, total: monthSessions.length, rows, pct: possible > 0 ? Math.round((present / possible) * 100) : 0 };
-      })
-      .filter(m => !q || m.rows.length > 0);
-  }, [classSessions, students, activity.id, q]);
+// Color según el nivel de asistencia
+const levelOf = (pct: number) => (pct >= 80 ? "high" : pct >= 50 ? "mid" : "low");
+const LEVEL = {
+  high: { stroke: "stroke-emerald-500", bg: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", soft: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" },
+  mid: { stroke: "stroke-amber-500", bg: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", soft: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" },
+  low: { stroke: "stroke-rose-500", bg: "bg-rose-500", text: "text-rose-600 dark:text-rose-400", soft: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400" },
+} as const;
 
-  if (months.length === 0) return null;
-
-  // Por defecto se despliega el mes más reciente (o todos si se está buscando un alumno)
-  const isOpen = (key: string, index: number) => (q ? true : index === 0) !== toggledMonths.has(key);
-  const toggle = (key: string) => setToggledMonths(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
+const buildMonthStats = (activityId: string, classSessions: ClassSession[], allStudents: Student[]): MonthStat[] => {
+  const groups = new Map<string, ClassSession[]>();
+  classSessions.forEach(s => {
+    const k = monthKeyOf(s.date);
+    if (!k) return;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(s);
   });
-  const totalClasses = months.reduce((acc, m) => acc + m.total, 0);
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, list]) => {
+      const sessionsSorted = [...list].sort((a, b) => (a.date || "").localeCompare(b.date || "") || a.id.localeCompare(b.id));
+      const rows = studentsInClass(allStudents, activityId, sessionsSorted).map(student => {
+        const marks = sessionsSorted.map(s => attendedIn(s, student.id));
+        return { student, marks, attended: marks.filter(Boolean).length };
+      });
+      const present = rows.reduce((acc, r) => acc + r.attended, 0);
+      const possible = rows.length * sessionsSorted.length;
+      return { key, sessions: sessionsSorted, rows, pct: possible > 0 ? Math.round((present / possible) * 100) : 0 };
+    });
+};
+
+const shortMonth = (key: string) => {
+  const [y, m] = key.split("-").map(Number);
+  return format(new Date(y, m - 1, 1), "MMM", { locale: es }).replace(".", "");
+};
+
+// Anillo de porcentaje
+const Ring: React.FC<{ pct: number; size?: number; stroke?: number; label?: boolean }> = ({ pct, size = 64, stroke = 7, label = true }) => {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const lvl = LEVEL[levelOf(pct)];
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-zinc-100 dark:stroke-zinc-800" />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} strokeLinecap="round"
+          className={lvl.stroke}
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - Math.min(100, Math.max(0, pct)) / 100)}
+          style={{ transition: "stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+        />
+      </svg>
+      {label && (
+        <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-zinc-900 dark:text-white tabular-nums">
+          {pct}<span className="text-[10px] font-bold opacity-60">%</span>
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Tarjeta compacta de una clase (vista general)
+const ClassOverviewCard: React.FC<{
+  activity: Activity;
+  months: MonthStat[]; // todos los meses de la clase, de más antiguo a más reciente
+  currentKey: string;
+  onOpen: (month: string) => void;
+}> = ({ activity, months, currentKey, onOpen }) => {
+  const idx = Math.max(0, months.findIndex(m => m.key === currentKey));
+  const current = months[idx];
+  const windowMonths = months.slice(Math.max(0, idx - 5), idx + 1);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col transition-all hover:shadow-md">
-      <div className="mb-3 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
-        <h4 className="font-black text-zinc-900 dark:text-white text-lg leading-tight">{activity.name}</h4>
-        <p className="text-xs font-medium text-zinc-500 mt-1 truncate">
-          {activity.location ? `${activity.location} · ` : ""}{totalClasses} {totalClasses === 1 ? "clase" : "clases"}
-        </p>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(current.key)}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(current.key); } }}
+      className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-zinc-300 dark:hover:border-zinc-700 active:scale-[0.99] outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+    >
+      <div className="flex items-center gap-4">
+        <Ring pct={current.pct} />
+        <div className="flex-1 min-w-0">
+          <h4 className="font-black text-zinc-900 dark:text-white text-lg leading-tight line-clamp-2">{activity.name}</h4>
+          {activity.location && <p className="text-xs font-medium text-zinc-500 truncate mt-0.5">{activity.location}</p>}
+          <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mt-1.5">
+            {monthLabel(current.key)} · {current.sessions.length} {current.sessions.length === 1 ? "clase" : "clases"} · {current.rows.length} {current.rows.length === 1 ? "alumno" : "alumnos"}
+          </p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-zinc-600 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-500" />
       </div>
 
-      <div className="flex flex-col gap-1">
-        {months.map((m, index) => {
-          const open = isOpen(m.key, index);
-          return (
-            <div key={m.key}>
+      {windowMonths.length > 1 && (
+        <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex items-end gap-2">
+          {windowMonths.map(m => {
+            const isCurrent = m.key === current.key;
+            return (
               <button
-                onClick={() => toggle(m.key)}
-                aria-expanded={open}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                  open ? "bg-zinc-50 dark:bg-zinc-800/60" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                key={m.key}
+                onClick={e => { e.stopPropagation(); onOpen(m.key); }}
+                title={`${monthLabel(m.key)}: ${m.pct}%`}
+                className="flex-1 max-w-[48px] flex flex-col items-center gap-1 group/bar"
+              >
+                <span className={`text-[10px] font-black tabular-nums leading-none ${isCurrent ? LEVEL[levelOf(m.pct)].text : "text-zinc-400 dark:text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity"}`}>{m.pct}%</span>
+                <div className="w-full h-12 flex items-end rounded-md bg-zinc-50 dark:bg-zinc-800/40">
+                  <div
+                    className={`w-full rounded-md transition-all duration-500 ${isCurrent ? LEVEL[levelOf(m.pct)].bg : "bg-zinc-300 dark:bg-zinc-600 group-hover/bar:bg-zinc-400 dark:group-hover/bar:bg-zinc-500"}`}
+                    style={{ height: `${Math.max(6, m.pct)}%` }}
+                  />
+                </div>
+                <span className={`text-[10px] font-bold uppercase ${isCurrent ? "text-zinc-800 dark:text-zinc-200" : "text-zinc-400"}`}>{shortMonth(m.key)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+// Ficha de una clase: meses, cifras y alumnos
+const ClassDetail: React.FC<{
+  activity: Activity;
+  months: MonthStat[];
+  initialMonth: string;
+  searchQuery: string;
+  onBack: () => void;
+  onOpenSheet: (month: string) => void;
+  toggleAttendance: (sessionId: string, studentId: string) => void;
+}> = ({ activity, months, initialMonth, searchQuery, onBack, onOpenSheet, toggleAttendance }) => {
+  const [monthKey, setMonthKey] = useState(initialMonth);
+  const [sortBy, setSortBy] = useState<"name" | "attendance">("name");
+  const [openStudent, setOpenStudent] = useState<string | null>(null);
+  const month = months.find(m => m.key === monthKey) ?? months[months.length - 1];
+  const q = searchQuery.trim().toLowerCase();
+
+  if (!month) return null;
+
+  const n = month.sessions.length;
+  const present = month.rows.reduce((acc, r) => acc + r.attended, 0);
+  const avgPerClass = n > 0 ? present / n : 0;
+  const rows = month.rows
+    .filter(r => !q || r.student.name.toLowerCase().includes(q) || (r.student.email || "").toLowerCase().includes(q))
+    .sort((a, b) => sortBy === "attendance"
+      ? b.attended - a.attended || a.student.name.localeCompare(b.student.name, "es")
+      : a.student.name.localeCompare(b.student.name, "es", { sensitivity: "base" }));
+
+  const kpi = "flex flex-col justify-center rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 px-4 py-3";
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="flex flex-col gap-4">
+      <button onClick={onBack} className="self-start text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors">
+        &larr; Todas las clases
+      </button>
+
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 md:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white leading-tight">{activity.name}</h3>
+            {activity.location && <p className="text-sm font-medium text-zinc-500 mt-1">{activity.location}</p>}
+          </div>
+          <button
+            onClick={() => onOpenSheet(month.key)}
+            className="shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-900 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm"
+          >
+            <TableIcon className="w-4 h-4" /> Hoja del mes y compartir
+          </button>
+        </div>
+
+        {/* Selector de meses */}
+        <div className="flex gap-2 overflow-x-auto -mx-5 px-5 md:mx-0 md:px-0 mt-5 pb-1 [scrollbar-width:none]">
+          {[...months].reverse().map(m => {
+            const active = m.key === month.key;
+            const lvl = LEVEL[levelOf(m.pct)];
+            return (
+              <button
+                key={m.key}
+                onClick={() => { setMonthKey(m.key); setOpenStudent(null); }}
+                className={`shrink-0 flex flex-col gap-1.5 px-3.5 py-2.5 rounded-2xl border text-left transition-all active:scale-95 ${
+                  active
+                    ? "bg-zinc-900 border-zinc-900 text-white dark:bg-white dark:border-white dark:text-zinc-900 shadow-sm"
+                    : "bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
-                <ChevronRight className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
-                <span className="flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{monthLabel(m.key)}</span>
-                <span className="text-[11px] font-semibold text-zinc-500 shrink-0">{m.total} {m.total === 1 ? "clase" : "clases"}</span>
-                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 w-10 text-right">{m.pct}%</span>
+                <span className="text-xs font-bold whitespace-nowrap">{monthLabel(m.key)}</span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-12 h-1 rounded-full overflow-hidden ${active ? "bg-white/20 dark:bg-zinc-900/15" : "bg-zinc-100 dark:bg-zinc-800"}`}>
+                    <div className={`h-full rounded-full ${lvl.bg}`} style={{ width: `${m.pct}%` }} />
+                  </div>
+                  <span className="text-[10px] font-black tabular-nums opacity-80">{m.pct}%</span>
+                </div>
               </button>
+            );
+          })}
+        </div>
 
-              <AnimatePresence initial={false}>
-                {open && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pl-10 pr-3 pt-1 pb-3 flex flex-col">
-                      {m.rows.length === 0 && (
-                        <p className="text-xs font-medium text-zinc-400 py-2">No hay alumnos inscritos.</p>
-                      )}
-                      {m.rows.map(r => {
-                        const pct = m.total > 0 ? Math.round((r.attended / m.total) * 100) : 0;
-                        return (
-                          <div key={r.student.id} className="flex items-center gap-3 py-1.5">
-                            <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-zinc-700 dark:text-zinc-200" title={r.student.name}>{r.student.name}</span>
-                            <div className="w-16 sm:w-24 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden shrink-0">
-                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 w-10 text-right">
-                              {r.attended}<span className="font-bold text-zinc-400">/{m.total}</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                      <button
-                        onClick={() => onOpenSheet(m.key)}
-                        className="self-start mt-2 text-[11px] font-bold text-rose-500 hover:text-rose-600 transition-colors"
-                      >
-                        Ver hoja del mes &rarr;
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+        {/* Cifras del mes */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={month.key}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+              <div className={`${kpi} flex-row items-center gap-3`}>
+                <Ring pct={month.pct} size={46} stroke={5} label={false} />
+                <div>
+                  <p className={`text-xl font-black tabular-nums leading-none ${LEVEL[levelOf(month.pct)].text}`}>{month.pct}%</p>
+                  <p className="text-[11px] font-semibold text-zinc-500 mt-1">asistencia</p>
+                </div>
+              </div>
+              <div className={kpi}>
+                <p className="text-xl font-black text-zinc-900 dark:text-white tabular-nums leading-none">{n}</p>
+                <p className="text-[11px] font-semibold text-zinc-500 mt-1">{n === 1 ? "clase" : "clases"}</p>
+              </div>
+              <div className={kpi}>
+                <p className="text-xl font-black text-zinc-900 dark:text-white tabular-nums leading-none">{month.rows.length}</p>
+                <p className="text-[11px] font-semibold text-zinc-500 mt-1">{month.rows.length === 1 ? "alumno" : "alumnos"}</p>
+              </div>
+              <div className={kpi}>
+                <p className="text-xl font-black text-zinc-900 dark:text-white tabular-nums leading-none">{avgPerClass.toLocaleString("es-ES", { maximumFractionDigits: 1 })}</p>
+                <p className="text-[11px] font-semibold text-zinc-500 mt-1">media por clase</p>
+              </div>
             </div>
-          );
-        })}
+
+            {/* Alumnos */}
+            <div className="flex items-center justify-between mt-6 mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Alumnos</p>
+              <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg">
+                {([["name", "A–Z"], ["attendance", "Asistencia"]] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setSortBy(v)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                      sortBy === v ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {rows.length === 0 && (
+              <p className="text-sm font-medium text-zinc-500 py-6 text-center">{q ? "Ningún alumno coincide con la búsqueda." : "No hay alumnos inscritos."}</p>
+            )}
+
+            <div className="flex flex-col">
+              {rows.map(r => {
+                const pct = n > 0 ? Math.round((r.attended / n) * 100) : 0;
+                const lvl = LEVEL[levelOf(pct)];
+                const isOpen = openStudent === r.student.id;
+                return (
+                  <motion.div layout="position" key={r.student.id} transition={{ duration: 0.2, ease: "easeOut" }} className="border-t border-zinc-100 dark:border-zinc-800/80 first:border-t-0">
+                    <button
+                      onClick={() => setOpenStudent(isOpen ? null : r.student.id)}
+                      aria-expanded={isOpen}
+                      className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-left transition-colors ${isOpen ? "bg-zinc-50 dark:bg-zinc-800/50" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"}`}
+                    >
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${lvl.soft}`}>
+                        {r.student.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100" title={r.student.name}>{r.student.name}</span>
+                      <span className="hidden sm:flex items-center gap-1 shrink-0" aria-hidden>
+                        {r.marks.map((m, i) => (
+                          <span key={i} className={`w-2.5 h-2.5 rounded-full ${m ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"}`} />
+                        ))}
+                      </span>
+                      <span className="text-xs font-black tabular-nums text-zinc-800 dark:text-zinc-100 shrink-0 w-9 text-right">
+                        {r.attended}<span className="font-bold text-zinc-400">/{n}</span>
+                      </span>
+                      <span className={`text-[11px] font-black tabular-nums px-2 py-0.5 rounded-md shrink-0 w-12 text-center ${lvl.soft}`}>{pct}%</span>
+                    </button>
+                    {/* Puntos por día en móvil */}
+                    {!isOpen && (
+                      <div className="sm:hidden flex items-center gap-1 pl-[3.25rem] -mt-1 pb-2" aria-hidden>
+                        {r.marks.map((m, i) => (
+                          <span key={i} className={`w-2 h-2 rounded-full ${m ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"}`} />
+                        ))}
+                      </div>
+                    )}
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="flex flex-wrap gap-1.5 pl-[3.25rem] pr-2 pt-1 pb-3">
+                            {month.sessions.map((s, i) => {
+                              const present = r.marks[i];
+                              return (
+                                <button
+                                  key={s.id}
+                                  onClick={() => toggleAttendance(s.id, r.student.id)}
+                                  title={present ? "Asistió · pulsa para quitar" : "No asistió · pulsa para marcar"}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 ${
+                                    present
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60"
+                                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                                  }`}
+                                >
+                                  {present ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5 opacity-60" />}
+                                  <span className="capitalize">{safeFormat(s.date, "EEE d", "")}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -593,6 +812,21 @@ export const AttendanceView = ({
 
   // Relación de Clases: por clase (por defecto) o por alumno
   const [relationBy, setRelationBy] = useState<"clase" | "alumno">("clase");
+  // Ficha de clase abierta en la Relación de Clases
+  const [relationClass, setRelationClass] = useState<{ activityId: string; month: string } | null>(null);
+
+  // Estadísticas por clase y mes (todas las clases realizadas)
+  const classStats = useMemo(() => {
+    const byActivity = new Map<string, ClassSession[]>();
+    heldSessions.forEach(s => {
+      if (!byActivity.has(s.activityId)) byActivity.set(s.activityId, []);
+      byActivity.get(s.activityId)!.push(s);
+    });
+    return Array.from(byActivity.entries())
+      .map(([activityId, list]) => ({ activity: activities.find(a => a.id === activityId), months: buildMonthStats(activityId, list, students) }))
+      .filter((g): g is { activity: Activity; months: MonthStat[] } => !!g.activity && g.months.length > 0)
+      .sort((a, b) => a.activity.name.localeCompare(b.activity.name, "es"));
+  }, [heldSessions, activities, students]);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const sortByDate = (a: ClassSession, b: ClassSession) => {
@@ -1114,7 +1348,7 @@ export const AttendanceView = ({
                 className="w-full pl-9 pr-3 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/50 transition-all text-zinc-800 dark:text-zinc-100 shadow-sm"
               />
             </div>
-            <div className="flex gap-3 w-full sm:w-auto sm:flex-1 lg:flex-none">
+            <div className={`flex gap-3 w-full sm:w-auto sm:flex-1 lg:flex-none ${relationBy === "clase" && relationClass ? "hidden" : ""}`}>
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(e.target.value)}
@@ -1226,7 +1460,7 @@ export const AttendanceView = ({
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 mb-4">
+              <div className={`flex items-center gap-2 mb-4 ${relationBy === "clase" && relationClass ? "hidden" : ""}`}>
                 <span className="text-xs font-semibold text-zinc-500">Ver por:</span>
                 <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg">
                   {(["clase", "alumno"] as const).map(v => (
@@ -1246,40 +1480,52 @@ export const AttendanceView = ({
               </div>
 
               {relationBy === "clase" ? (() => {
+                const openSheetFor = (activityId: string, month: string) => {
+                  setPassMonth(month);
+                  setSheet({ activityId, month, from: "table" });
+                  setViewMode("pass");
+                };
+
+                // Ficha de una clase
+                const detail = relationClass && classStats.find(g => g.activity.id === relationClass.activityId);
+                if (relationClass && detail) {
+                  return (
+                    <ClassDetail
+                      key={detail.activity.id}
+                      activity={detail.activity}
+                      months={detail.months}
+                      initialMonth={relationClass.month}
+                      searchQuery={searchQuery}
+                      onBack={() => setRelationClass(null)}
+                      onOpenSheet={(month) => openSheetFor(detail.activity.id, month)}
+                      toggleAttendance={toggleAttendanceTable}
+                    />
+                  );
+                }
+
+                // Vista general: una tarjeta compacta por clase
                 const q = searchQuery.trim().toLowerCase();
-                const groups = Array.from(
-                  tableSessions.reduce((map, s) => {
-                    if (!map.has(s.activityId)) map.set(s.activityId, []);
-                    map.get(s.activityId)!.push(s);
-                    return map;
-                  }, new Map<string, ClassSession[]>())
-                )
-                  .map(([activityId, classSessions]) => ({ activity: activities.find(a => a.id === activityId), classSessions }))
-                  .filter((g): g is { activity: Activity; classSessions: ClassSession[] } => !!g.activity)
-                  .filter(g => !q || studentsInClass(students, g.activity.id, g.classSessions)
-                    .some(st => st.name.toLowerCase().includes(q) || (st.email || "").toLowerCase().includes(q)))
-                  .sort((a, b) => a.activity.name.localeCompare(b.activity.name, "es"));
+                const cards = classStats
+                  .filter(g => selectedActivityId === "all" || g.activity.id === selectedActivityId)
+                  .filter(g => selectedMonth === "all" || g.months.some(m => m.key === selectedMonth))
+                  .filter(g => !q || g.months.some(m => m.rows.some(r =>
+                    r.student.name.toLowerCase().includes(q) || (r.student.email || "").toLowerCase().includes(q))));
 
                 return (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 items-start">
-                    {groups.length === 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
+                    {cards.length === 0 && (
                       <div className="col-span-full flex flex-col items-center justify-center p-12 bg-white/50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500">
                         <Search className="w-12 h-12 mb-4 opacity-30" />
-                        <p className="text-center font-medium">No se encontraron alumnos.</p>
+                        <p className="text-center font-medium">{q ? "No se encontraron alumnos." : "No hay clases en este periodo."}</p>
                       </div>
                     )}
-                    {groups.map(g => (
-                      <ClassRelationCard
+                    {cards.map(g => (
+                      <ClassOverviewCard
                         key={g.activity.id}
                         activity={g.activity}
-                        classSessions={g.classSessions}
-                        students={students}
-                        searchQuery={searchQuery}
-                        onOpenSheet={(month) => {
-                          setPassMonth(month);
-                          setSheet({ activityId: g.activity.id, month, from: "table" });
-                          setViewMode("pass");
-                        }}
+                        months={g.months}
+                        currentKey={selectedMonth !== "all" ? selectedMonth : g.months[g.months.length - 1].key}
+                        onOpen={(month) => setRelationClass({ activityId: g.activity.id, month })}
                       />
                     ))}
                   </div>
