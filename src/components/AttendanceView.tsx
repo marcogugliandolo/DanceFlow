@@ -67,8 +67,8 @@ const StudentTableCard: React.FC<{
       });
   }, [relevantSessions, student.id]);
 
-  // Si solo hay un mes (p. ej. filtrando por mes), se muestra desplegado por defecto
-  const isMonthOpen = (key: string) => monthGroups.length === 1 ? !toggledMonths.has(key) : toggledMonths.has(key);
+  // Todos los meses salen plegados; se despliegan al tocarlos
+  const isMonthOpen = (key: string) => toggledMonths.has(key);
   const toggleMonth = (key: string) => {
     setToggledMonths(prev => {
       const next = new Set(prev);
@@ -250,13 +250,15 @@ const Ring: React.FC<{ pct: number; size?: number; stroke?: number; label?: bool
   );
 };
 
-// Tarjeta compacta de una clase (vista general)
+// Tarjeta de una clase (vista general). Sale plegada: al tocarla se despliega
+// con el gráfico de los últimos meses y el acceso a la ficha de la clase.
 const ClassOverviewCard: React.FC<{
   activity: Activity;
   months: MonthStat[]; // todos los meses de la clase, de más antiguo a más reciente
   currentKey: string;
   onOpen: (month: string) => void;
 }> = ({ activity, months, currentKey, onOpen }) => {
+  const [expanded, setExpanded] = useState(false);
   const idx = Math.max(0, months.findIndex(m => m.key === currentKey));
   const current = months[idx];
   const windowMonths = months.slice(Math.max(0, idx - 5), idx + 1);
@@ -267,14 +269,16 @@ const ClassOverviewCard: React.FC<{
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(current.key)}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(current.key); } }}
-      className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-zinc-300 dark:hover:border-zinc-700 active:scale-[0.99] outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+      className={`group bg-white dark:bg-zinc-900 border rounded-3xl shadow-sm transition-colors ${
+        expanded ? "border-zinc-300 dark:border-zinc-700" : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+      }`}
     >
-      <div className="flex items-center gap-4">
-        <Ring pct={current.pct} />
+      <button
+        onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+        className="w-full flex items-center gap-4 p-4 sm:p-5 text-left rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99] transition-transform"
+      >
+        <Ring pct={current.pct} size={56} stroke={6} />
         <div className="flex-1 min-w-0">
           <h4 className="font-black text-zinc-900 dark:text-white text-lg leading-tight line-clamp-2">{activity.name}</h4>
           {activity.location && <p className="text-xs font-medium text-zinc-500 truncate mt-0.5">{activity.location}</p>}
@@ -282,33 +286,55 @@ const ClassOverviewCard: React.FC<{
             {monthLabel(current.key)} · {current.sessions.length} {current.sessions.length === 1 ? "clase" : "clases"} · {current.rows.length} {current.rows.length === 1 ? "alumno" : "alumnos"}
           </p>
         </div>
-        <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-zinc-600 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-500" />
-      </div>
+        <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${expanded ? "bg-zinc-100 dark:bg-zinc-800" : "group-hover:bg-zinc-100 dark:group-hover:bg-zinc-800"}`}>
+          <ChevronRight className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
+        </span>
+      </button>
 
-      {windowMonths.length > 1 && (
-        <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex items-end gap-2">
-          {windowMonths.map(m => {
-            const isCurrent = m.key === current.key;
-            return (
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 sm:px-5 pb-4 sm:pb-5">
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex items-end gap-2">
+                {windowMonths.map(m => {
+                  const isCurrent = m.key === current.key;
+                  return (
+                    <button
+                      key={m.key}
+                      onClick={() => onOpen(m.key)}
+                      title={`${monthLabel(m.key)}: ${m.pct}% · ver ficha`}
+                      className="flex-1 max-w-[48px] flex flex-col items-center gap-1 group/bar"
+                    >
+                      <span className={`text-[10px] font-black tabular-nums leading-none ${isCurrent ? LEVEL[levelOf(m.pct)].text : "text-zinc-400 dark:text-zinc-500"}`}>{m.pct}%</span>
+                      <div className="w-full h-12 flex items-end rounded-md bg-zinc-50 dark:bg-zinc-800/40">
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${Math.max(6, m.pct)}%` }}
+                          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                          className={`w-full rounded-md ${isCurrent ? LEVEL[levelOf(m.pct)].bg : "bg-zinc-300 dark:bg-zinc-600 group-hover/bar:bg-zinc-400 dark:group-hover/bar:bg-zinc-500"}`}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase ${isCurrent ? "text-zinc-800 dark:text-zinc-200" : "text-zinc-400"}`}>{shortMonth(m.key)}</span>
+                    </button>
+                  );
+                })}
+              </div>
               <button
-                key={m.key}
-                onClick={e => { e.stopPropagation(); onOpen(m.key); }}
-                title={`${monthLabel(m.key)}: ${m.pct}%`}
-                className="flex-1 max-w-[48px] flex flex-col items-center gap-1 group/bar"
+                onClick={() => onOpen(current.key)}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-900 rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
               >
-                <span className={`text-[10px] font-black tabular-nums leading-none ${isCurrent ? LEVEL[levelOf(m.pct)].text : "text-zinc-400 dark:text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity"}`}>{m.pct}%</span>
-                <div className="w-full h-12 flex items-end rounded-md bg-zinc-50 dark:bg-zinc-800/40">
-                  <div
-                    className={`w-full rounded-md transition-all duration-500 ${isCurrent ? LEVEL[levelOf(m.pct)].bg : "bg-zinc-300 dark:bg-zinc-600 group-hover/bar:bg-zinc-400 dark:group-hover/bar:bg-zinc-500"}`}
-                    style={{ height: `${Math.max(6, m.pct)}%` }}
-                  />
-                </div>
-                <span className={`text-[10px] font-bold uppercase ${isCurrent ? "text-zinc-800 dark:text-zinc-200" : "text-zinc-400"}`}>{shortMonth(m.key)}</span>
+                Ver alumnos y asistencia <ChevronRight className="w-4 h-4" />
               </button>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
