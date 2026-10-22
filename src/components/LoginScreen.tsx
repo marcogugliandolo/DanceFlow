@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from "motion/react";
-import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2, Sparkle } from "lucide-react";
 
 type LoginScreenProps = {
   username: string;
@@ -16,54 +16,85 @@ type LoginScreenProps = {
   logoSrc: string;
 };
 
-// Paso básico de salsa: 1-2-3, pausa, 5-6-7, pausa.
-// Los tiempos con paso se rellenan con el degradado de la marca; las pausas (4 y 8) quedan huecas.
-const BEATS = [1, 2, 3, 4, 5, 6, 7, 8];
-const isPause = (b: number) => b === 4 || b === 8;
-
-const ROSE = [244, 63, 94];
-const FUCHSIA = [217, 70, 239];
-const beatColor = (b: number) => {
-  const t = (b - 1) / 6;
-  const c = ROSE.map((v, i) => Math.round(v + (FUCHSIA[i] - v) * t));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+// ---------- Escenario de baile ----------
+// Dos focos que barren suavemente el escenario y apuntan al logo de la escuela.
+const Spotlight: React.FC<{ side: "left" | "right"; color: string; delay: number }> = ({ side, color, delay }) => {
+  const reduce = useReducedMotion();
+  const left = side === "left";
+  return (
+    <motion.div
+      className="absolute top-[-8%] h-[95%] w-[60%] pointer-events-none"
+      style={{
+        [left ? "left" : "right"]: "-6%",
+        background: `linear-gradient(to bottom, ${color} 0%, ${color.replace(/[\d.]+\)$/, "0.12)")} 55%, transparent 85%)`,
+        clipPath: left ? "polygon(0 0, 18% 0, 100% 100%, 52% 100%)" : "polygon(82% 0, 100% 0, 48% 100%, 0 100%)",
+        filter: "blur(22px)",
+        transformOrigin: left ? "0% 0%" : "100% 0%",
+        mixBlendMode: "screen",
+      }}
+      initial={reduce ? false : { opacity: 0 }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: left ? [-3, 4, -3] : [3, -4, 3] }}
+      transition={reduce ? { duration: 0 } : { opacity: { duration: 1.2, delay }, rotate: { duration: 10, repeat: Infinity, ease: "easeInOut", delay } }}
+    />
+  );
 };
 
-const BeatRow: React.FC<{ size: number; tone: "stage" | "auto" }> = ({ size, tone }) => {
+// Logo de la escuela bajo los focos, con el reflejo de luz en el suelo
+const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
   const reduce = useReducedMotion();
-  const pauseRing = tone === "stage" ? "border-zinc-700" : "border-zinc-300 dark:border-zinc-700";
-  const number = tone === "stage" ? "text-zinc-500" : "text-zinc-400 dark:text-zinc-500";
   return (
-    <div className="flex items-start justify-between w-full" aria-hidden>
-      {BEATS.map((b, i) => (
-        <div key={b} className="flex flex-col items-center gap-2.5">
-          {isPause(b) ? (
-            <motion.span
-              initial={reduce ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: reduce ? 0 : 0.3 + i * 0.2, duration: 0.2 }}
-              className={`rounded-full border-2 ${pauseRing}`}
-              style={{ width: size, height: size }}
-            />
-          ) : (
-            <motion.span
-              initial={reduce ? false : { scale: 0.4, opacity: 0.15 }}
-              animate={{ scale: reduce ? 1 : [0.4, 1.18, 1], opacity: 1 }}
-              transition={{ delay: reduce ? 0 : 0.3 + i * 0.2, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-full"
-              style={{ width: size, height: size, background: beatColor(b) }}
-            />
-          )}
-          <span className={`text-xs font-bold tabular-nums ${number}`}>{b}</span>
-        </div>
-      ))}
+    <div className="relative flex flex-col items-center">
+      <motion.div
+        initial={reduce ? false : { scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full bg-black ring-1 ring-white/15 flex items-center justify-center shadow-[0_0_90px_-10px_rgba(217,70,239,0.55)]"
+      >
+        <img src={logoSrc} alt="Logo de SalsaNova" className="w-full h-full object-contain p-5 sm:p-6 lg:p-7" />
+      </motion.div>
+      <div className="w-56 sm:w-72 lg:w-80 h-6 sm:h-8 -mt-2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.45),transparent_70%)] blur-[6px]" aria-hidden />
     </div>
   );
 };
 
-const Wordmark: React.FC<{ logoSrc: string; tone: "stage" | "auto" }> = ({ logoSrc, tone }) => (
-  <div className="flex items-center gap-3">
-    <span className="w-10 h-10 rounded-full bg-zinc-900 ring-1 ring-white/10 overflow-hidden flex items-center justify-center shrink-0">
+// Cinta con los estilos de baile
+const DANCE_STYLES_A = ["Salsa", "Bachata", "Salón", "Kizomba", "Merengue"];
+const DANCE_STYLES_B = ["Pilates", "Danzas", "Cha-cha-chá", "Rueda de casino", "Tango"];
+
+const StyleMarquee: React.FC<{ items: string[]; reverse?: boolean; outline?: boolean; className?: string }> = ({ items, reverse, outline, className = "" }) => {
+  const reduce = useReducedMotion();
+  const row = (copy: number) => (
+    <div className="flex items-center shrink-0" aria-hidden={copy > 0}>
+      {items.map(s => (
+        <span key={`${copy}-${s}`} className="flex items-center">
+          <span
+            className="text-[34px] sm:text-[46px] lg:text-[56px] font-black tracking-[-0.035em] leading-none whitespace-nowrap px-4 sm:px-6"
+            style={outline ? { WebkitTextStroke: "1.5px rgba(255,255,255,0.4)", color: "transparent" } : undefined}
+          >
+            {s}
+          </span>
+          <Sparkle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${outline ? "text-fuchsia-500" : "text-rose-500"}`} fill="currentColor" />
+        </span>
+      ))}
+    </div>
+  );
+  return (
+    <div className={`overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)] ${className}`}>
+      <motion.div
+        className="flex w-max py-1"
+        animate={reduce ? undefined : { x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
+        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+      >
+        {row(0)}
+        {row(1)}
+      </motion.div>
+    </div>
+  );
+};
+
+const Wordmark: React.FC<{ logoSrc: string; tone: "stage" | "auto"; showLogo?: boolean }> = ({ logoSrc, tone, showLogo = true }) => (
+  <div className="flex items-center gap-3 min-h-10">
+    <span className={`${showLogo ? "flex" : "hidden"} w-10 h-10 rounded-full bg-zinc-900 ring-1 ring-white/10 overflow-hidden items-center justify-center shrink-0`}>
       <img src={logoSrc} alt="" className="w-full h-full object-contain p-1.5" />
     </span>
     <span className={`text-xl font-black tracking-tight ${tone === "stage" ? "text-white" : "text-zinc-900 dark:text-white"}`}>
@@ -101,30 +132,44 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const fieldBorder = loginError ? "border-rose-400 dark:border-rose-500/60" : "border-zinc-300 dark:border-zinc-800";
 
   return (
-    <div className="min-h-[100dvh] grid lg:grid-cols-[1.05fr_1fr] bg-white dark:bg-[#09090b] font-sans selection:bg-rose-500/30">
-      {/* Escenario (solo en pantallas grandes): siempre oscuro */}
-      <section className="hidden lg:flex flex-col justify-between bg-black text-white px-14 xl:px-20 py-12 border-r border-white/5">
-        <Wordmark logoSrc={logoSrc} tone="stage" />
-
-        <div className="max-w-[520px]">
-          <h2 className="text-[56px] xl:text-[64px] font-black leading-[0.95] tracking-[-0.035em]">
-            Lleva la cuenta de tus clases.
-          </h2>
-          <p className="mt-6 text-lg text-zinc-400 leading-relaxed max-w-[440px]">
-            Pasa lista, mira la asistencia de cada mes y comparte la hoja con quien la necesite.
-          </p>
-          <div className="mt-14 max-w-[460px]">
-            <BeatRow size={40} tone="stage" />
-          </div>
+    <div className="min-h-[100dvh] flex flex-col lg:grid lg:grid-cols-[1.05fr_1fr] bg-white dark:bg-[#09090b] font-sans selection:bg-rose-500/30">
+      {/* Escenario de baile: siempre oscuro. Panel izquierdo en ordenador; cabecera en tablet y móvil */}
+      <section className="relative isolate overflow-hidden flex flex-col bg-black text-white pt-5 sm:pt-8 lg:pt-12 pb-6 sm:pb-10 lg:pb-12 rounded-b-[28px] sm:rounded-b-[36px] lg:rounded-none border-b border-white/5 lg:border-b-0 lg:border-r">
+        <div className="absolute inset-0 -z-10" aria-hidden>
+          <Spotlight side="left" color="rgba(244,63,94,0.55)" delay={0} />
+          <Spotlight side="right" color="rgba(192,38,211,0.55)" delay={0.4} />
         </div>
 
-        <p className="text-sm text-zinc-500">Panel de gestión de la escuela de baile SalsaNova</p>
+        <div className="px-5 sm:px-10 lg:px-14 xl:px-20 flex items-center justify-between">
+          <Wordmark logoSrc={logoSrc} tone="stage" showLogo={false} />
+          <button
+            onClick={onToggleTheme}
+            aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
+            className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-10 lg:px-14 mt-4 sm:mt-8 lg:mt-0">
+          <StageLogo logoSrc={logoSrc} />
+          <h2 className="mt-4 sm:mt-6 text-[30px] sm:text-[44px] lg:text-[52px] xl:text-[58px] font-black leading-[1] tracking-[-0.035em] text-balance max-w-[560px]">
+            Lleva la cuenta de tus clases.
+          </h2>
+          <p className="hidden sm:block mt-4 text-base lg:text-lg text-zinc-400 leading-relaxed max-w-[440px] text-balance">
+            Pasa lista, mira la asistencia de cada mes y comparte la hoja con quien la necesite.
+          </p>
+        </div>
+
+        <div className="mt-6 sm:mt-10 lg:mt-8 flex flex-col">
+          <StyleMarquee items={DANCE_STYLES_A} />
+          <StyleMarquee items={DANCE_STYLES_B} reverse outline className="hidden sm:block" />
+        </div>
       </section>
 
       {/* Formulario */}
-      <section className="relative flex flex-col px-5 sm:px-10 py-6 sm:py-10">
-        <div className="flex items-center justify-between lg:justify-end">
-          <div className="lg:hidden"><Wordmark logoSrc={logoSrc} tone="auto" /></div>
+      <section className="relative flex-1 flex flex-col px-5 sm:px-10 py-7 sm:py-12 lg:py-10">
+        <div className="hidden lg:flex justify-end">
           <button
             onClick={onToggleTheme}
             aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
@@ -134,16 +179,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col justify-center w-full max-w-[380px] mx-auto py-10">
-          {/* En móvil, el compás va arriba del formulario */}
-          <div className="lg:hidden mb-10 px-1">
-            <BeatRow size={22} tone="auto" />
-          </div>
+        <div className="flex-1 flex flex-col lg:justify-center w-full max-w-[400px] mx-auto lg:py-10">
+          <h1 className="text-[26px] sm:text-[32px] font-black tracking-[-0.025em] text-zinc-900 dark:text-white leading-tight">Entra en tu panel</h1>
+          <p className="hidden sm:block mt-2 text-[15px] text-zinc-500 dark:text-zinc-400">Con tu usuario y contraseña, o con tu cuenta de Google.</p>
 
-          <h1 className="text-[32px] font-black tracking-[-0.025em] text-zinc-900 dark:text-white leading-tight">Entra en tu panel</h1>
-          <p className="mt-2 text-[15px] text-zinc-500 dark:text-zinc-400">Con tu usuario y contraseña, o con tu cuenta de Google.</p>
-
-          <motion.form animate={shake} onSubmit={onSubmit} className="mt-8 flex flex-col gap-5" noValidate={false}>
+          <motion.form animate={shake} onSubmit={onSubmit} className="mt-5 sm:mt-8 flex flex-col gap-5" noValidate={false}>
             <div>
               <label htmlFor="login-user" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Usuario o correo</label>
               <input
@@ -223,7 +263,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <GoogleIcon /> Entrar con Google
           </button>
 
-          <p className="mt-10 text-sm text-zinc-500 dark:text-zinc-500 leading-relaxed">
+          <p className="mt-8 sm:mt-10 text-sm text-zinc-500 dark:text-zinc-500 leading-relaxed">
             ¿No puedes entrar? Pide a quien administra SalsaNova que revise tu cuenta.
           </p>
         </div>
