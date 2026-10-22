@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from "motion/react";
 import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2 } from "lucide-react";
+// Logo vectorizado (nítido a cualquier tamaño)
+import logoVector from "../assets/logo-salsanova.svg";
 
 type LoginScreenProps = {
   username: string;
@@ -44,7 +46,7 @@ const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
   return (
     <div className="relative flex flex-col items-center">
       <motion.img
-        src={logoSrc}
+        src={logoVector}
         alt="Escuela de Baile SalsaNova"
         draggable={false}
         initial={reduce ? false : { opacity: 0, y: 8 }}
