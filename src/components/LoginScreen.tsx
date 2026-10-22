@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from "motion/react";
+import {
+  motion,
+  AnimatePresence,
+  useReducedMotion,
+  useAnimationControls,
+  useMotionValue,
+  useSpring,
+  useMotionTemplate,
+} from "motion/react";
 import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2 } from "lucide-react";
-// Logo vectorizado (nítido a cualquier tamaño)
-import logoVector from "../assets/logo-salsanova.svg";
+import { DANCERS_PATH, DANCERS_VIEWBOX } from "../assets/dancers";
 
 type LoginScreenProps = {
   username: string;
@@ -15,77 +22,113 @@ type LoginScreenProps = {
   onGoogle: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
-  logoSrc: string;
+  logoSrc?: string;
 };
 
-// ---------- Escenario de baile ----------
-// Un único foco suave que cae desde arriba sobre el logo. Solo aparece al cargar; no se mueve.
-const SoftSpotlight: React.FC = () => {
+// Curva de entrada suave usada en toda la escena
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+// ---------- La pareja de baile ----------
+// La silueta del logo se dibuja sola con una línea de luz rosa-fucsia y después se rellena.
+// Al final queda un borde de neón muy suave alrededor.
+const Dancers: React.FC<{ className?: string }> = ({ className }) => {
   const reduce = useReducedMotion();
   return (
-    <div className="absolute inset-x-0 top-0 h-[78%] flex justify-center pointer-events-none" aria-hidden>
+    <svg viewBox={DANCERS_VIEWBOX} className={className} role="img" aria-label="Pareja bailando, del logo de SalsaNova">
+      <defs>
+        <linearGradient id="dancers-stroke" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fb7185" />
+          <stop offset="55%" stopColor="#f43f5e" />
+          <stop offset="100%" stopColor="#d946ef" />
+        </linearGradient>
+        <filter id="dancers-glow" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <motion.path
+        d={DANCERS_PATH}
+        fillRule="evenodd"
+        className="fill-zinc-900 dark:fill-white"
+        initial={reduce ? false : { fillOpacity: 0 }}
+        animate={{ fillOpacity: 1 }}
+        transition={{ delay: reduce ? 0 : 2.0, duration: 0.9, ease: "easeOut" }}
+      />
+      {!reduce && (
+        <motion.path
+          d={DANCERS_PATH}
+          fill="none"
+          stroke="url(#dancers-stroke)"
+          strokeWidth={6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter="url(#dancers-glow)"
+          initial={{ pathLength: 0, opacity: 1 }}
+          animate={{ pathLength: 1, opacity: [1, 1, 0.45] }}
+          transition={{
+            pathLength: { delay: 0.35, duration: 1.9, ease: [0.65, 0, 0.35, 1] },
+            opacity: { delay: 0.35, duration: 3.1, times: [0, 0.7, 1] },
+          }}
+        />
+      )}
+    </svg>
+  );
+};
+
+// Escena: foco desde arriba, pareja, reflejo en el suelo y nombre de la escuela
+const Stage: React.FC = () => {
+  const reduce = useReducedMotion();
+  return (
+    <div className="relative flex flex-col items-center lg:items-start text-center lg:text-left">
+      <div className="relative">
+        {/* Foco */}
+        <div className="absolute -top-[70%] inset-x-0 h-[170%] flex justify-center pointer-events-none" aria-hidden>
+          <motion.div
+            className="h-full w-[150%] shrink-0"
+            style={{
+              background: "linear-gradient(to bottom, rgba(244,63,94,0.20), rgba(217,70,239,0.08) 55%, transparent 90%)",
+              clipPath: "polygon(44% 0, 56% 0, 100% 100%, 0 100%)",
+              filter: "blur(18px)",
+            }}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+          />
+        </div>
+
+        <Dancers className="relative w-[200px] sm:w-[300px] lg:w-[440px] xl:w-[500px] h-auto" />
+
+        {/* Reflejo de luz en el suelo, que "respira" muy despacio */}
+        <motion.div
+          className="mx-auto w-[85%] h-6 sm:h-8 -mt-1 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.45),transparent_70%)] blur-[8px]"
+          aria-hidden
+          initial={reduce ? false : { opacity: 0, scaleX: 0.6 }}
+          animate={reduce ? { opacity: 1 } : { opacity: [0, 1, 0.75, 1], scaleX: [0.6, 1, 1.06, 1] }}
+          transition={reduce ? { duration: 0 } : { duration: 6, delay: 1.2, times: [0, 0.2, 0.6, 1], repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+        />
+      </div>
+
       <motion.div
-        className="h-full w-[460px] sm:w-[560px]"
-        style={{
-          background: "linear-gradient(to bottom, rgba(255,255,255,0.13), rgba(244,63,94,0.07) 60%, transparent 95%)",
-          clipPath: "polygon(43% 0, 57% 0, 100% 100%, 0 100%)",
-          filter: "blur(14px)",
-        }}
-        initial={reduce ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.4, ease: "easeOut" }}
-      />
-    </div>
-  );
-};
-
-// Logo de la escuela (blanco sobre transparente) directamente sobre el escenario,
-// bajo el foco y con el reflejo de luz en el suelo
-const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
-  const reduce = useReducedMotion();
-  return (
-    <div className="relative flex flex-col items-center">
-      <motion.img
-        src={logoVector}
-        alt="Escuela de Baile SalsaNova"
-        draggable={false}
-        initial={reduce ? false : { opacity: 0, y: 8 }}
+        initial={reduce ? false : { opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="w-[230px] sm:w-[320px] lg:w-[380px] xl:w-[420px] h-auto select-none drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
-      />
-      <div
-        className="w-[280px] sm:w-[360px] lg:w-[420px] h-5 sm:h-7 mt-2 sm:mt-3 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.32),transparent_70%)] blur-[6px]"
-        aria-hidden
-      />
+        transition={{ delay: reduce ? 0 : 2.1, duration: 0.7, ease: EASE_OUT }}
+        className="mt-4 sm:mt-6"
+      >
+        <p className="text-sm sm:text-base font-semibold text-zinc-500 dark:text-zinc-400">Escuela de Baile</p>
+        <p className="text-[40px] sm:text-[56px] lg:text-[72px] font-black tracking-[-0.045em] leading-[0.95] text-zinc-900 dark:text-white">
+          Salsa<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Nova</span>
+        </p>
+        <p className="hidden sm:block mt-4 lg:mt-5 text-base lg:text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-[420px] mx-auto lg:mx-0">
+          Lleva la cuenta de tus clases: pasa lista, mira la asistencia de cada mes y compártela.
+        </p>
+      </motion.div>
     </div>
   );
 };
-
-// Estilos de baile de la escuela, en una línea discreta
-const DANCE_STYLES = ["Salsa", "Bachata", "Salón", "Kizomba", "Pilates"];
-
-const StyleList: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <ul className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-medium text-zinc-500 ${className}`} aria-label="Estilos de baile">
-    {DANCE_STYLES.map((s, i) => (
-      <li key={s} className="flex items-center gap-3">
-        {i > 0 && <span className="w-1 h-1 rounded-full bg-rose-500/70" aria-hidden />}
-        {s}
-      </li>
-    ))}
-  </ul>
-);
-
-const Wordmark: React.FC<{ logoSrc: string; tone: "stage" | "auto"; showLogo?: boolean }> = ({ logoSrc, tone, showLogo = true }) => (
-  <div className="flex items-center gap-3 min-h-10">
-    <span className={`${showLogo ? "flex" : "hidden"} w-10 h-10 rounded-full bg-zinc-900 ring-1 ring-white/10 overflow-hidden items-center justify-center shrink-0`}>
-      <img src={logoSrc} alt="" className="w-full h-full object-contain p-1.5" />
-    </span>
-    <span className={`text-xl font-black tracking-tight ${tone === "stage" ? "text-white" : "text-zinc-900 dark:text-white"}`}>
-      Salsa<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">Nova</span>
-    </span>
-  </div>
-);
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden>
@@ -98,11 +141,18 @@ const GoogleIcon = () => (
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   username, setUsername, password, setPassword, onSubmit, isLoggingIn, loginError,
-  onGoogle, isDarkMode, onToggleTheme, logoSrc,
+  onGoogle, isDarkMode, onToggleTheme,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const reduce = useReducedMotion();
   const shake = useAnimationControls();
+
+  // Luz que sigue suavemente al ratón (solo se ve en pantallas grandes)
+  const mx = useMotionValue(-1000);
+  const my = useMotionValue(-1000);
+  const sx = useSpring(mx, { stiffness: 90, damping: 22 });
+  const sy = useSpring(my, { stiffness: 90, damping: 22 });
+  const cursorLight = useMotionTemplate`radial-gradient(560px circle at ${sx}px ${sy}px, rgba(244,63,94,0.10), transparent 65%)`;
 
   // Al fallar, el formulario hace un pequeño "no" con la cabeza
   useEffect(() => {
@@ -110,143 +160,156 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   }, [loginError]);
 
   const field =
-    "w-full h-12 px-4 rounded-xl bg-white dark:bg-zinc-900 border text-[15px] font-medium text-zinc-900 dark:text-zinc-100 " +
-    "placeholder:text-zinc-400 dark:placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] " +
-    "focus:border-rose-500 focus:ring-4 focus:ring-rose-500/15";
-  const fieldBorder = loginError ? "border-rose-400 dark:border-rose-500/60" : "border-zinc-300 dark:border-zinc-800";
+    "w-full h-12 px-4 rounded-2xl border text-[15px] font-medium outline-none transition-[border-color,box-shadow,background-color] " +
+    "bg-white text-zinc-900 placeholder:text-zinc-400 " +
+    "dark:bg-white/[0.04] dark:text-white dark:placeholder:text-zinc-600 " +
+    "focus:border-rose-500 focus:ring-4 focus:ring-rose-500/15 dark:focus:border-rose-400 dark:focus:bg-white/[0.06]";
+  const fieldBorder = loginError ? "border-rose-400 dark:border-rose-500/60" : "border-zinc-200 dark:border-white/10";
+
+  // Entrada escalonada de los elementos del formulario
+  const item = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_OUT } },
+  };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col lg:grid lg:grid-cols-[1.05fr_1fr] bg-white dark:bg-[#09090b] font-sans selection:bg-rose-500/30">
-      {/* Escenario de baile: siempre oscuro. Panel izquierdo en ordenador; cabecera en tablet y móvil */}
-      <section className="relative isolate overflow-hidden flex flex-col bg-black text-white pt-5 sm:pt-8 lg:pt-12 pb-7 sm:pb-10 lg:pb-12 rounded-b-[28px] sm:rounded-b-[36px] lg:rounded-none border-b border-white/5 lg:border-b-0 lg:border-r">
-        <div className="absolute inset-0 -z-10" aria-hidden>
-          <SoftSpotlight />
+    <div
+      className="relative min-h-[100dvh] overflow-hidden bg-zinc-50 dark:bg-[#070609] font-sans selection:bg-rose-500/30"
+      onPointerMove={e => { mx.set(e.clientX); my.set(e.clientY); }}
+    >
+      {/* Fondo: trama de puntos de pista de baile + luz del ratón + resplandor de suelo */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute inset-0 bg-[radial-gradient(rgba(24,24,27,0.07)_1px,transparent_1px)] dark:bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black_25%,transparent_75%)]" />
+        <motion.div className="absolute inset-0 hidden lg:block" style={{ background: cursorLight }} />
+        <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[900px] h-[360px] rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(217,70,239,0.16),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(217,70,239,0.20),transparent_70%)] blur-2xl" />
+      </div>
+
+      <button
+        onClick={onToggleTheme}
+        aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-900/5 dark:hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+      >
+        {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
+
+      <div className="relative z-10 min-h-[100dvh] w-full max-w-6xl mx-auto px-5 sm:px-8 py-10 sm:py-14 flex flex-col lg:flex-row items-center justify-center gap-8 sm:gap-12 lg:gap-20">
+        <div className="lg:flex-1 flex justify-center lg:justify-start">
+          <Stage />
         </div>
 
-        <div className="px-5 sm:px-10 lg:px-14 xl:px-20 flex items-center justify-end lg:hidden">
-          <button
-            onClick={onToggleTheme}
-            aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
-            className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+        {/* Tarjeta del formulario, flotando sobre la escena */}
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 28, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: reduce ? 0 : 0.9, type: "spring", stiffness: 140, damping: 20 }}
+          className="w-full max-w-[420px] rounded-[28px] border border-zinc-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.035] backdrop-blur-xl shadow-[0_24px_80px_-24px_rgba(24,24,27,0.25)] dark:shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] p-6 sm:p-8"
+        >
+          <motion.div
+            initial={reduce ? false : "hidden"}
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { delayChildren: reduce ? 0 : 1.15, staggerChildren: 0.06 } } }}
           >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-        </div>
+            <motion.h1 variants={item} className="text-[26px] sm:text-[30px] font-black tracking-[-0.03em] text-zinc-900 dark:text-white leading-tight">
+              Entra en tu panel
+            </motion.h1>
+            <motion.p variants={item} className="mt-1.5 text-[15px] text-zinc-500 dark:text-zinc-400">
+              Con tu usuario y contraseña, o con Google.
+            </motion.p>
 
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-10 lg:px-14 mt-3 sm:mt-4 lg:mt-0">
-          <StageLogo logoSrc={logoSrc} />
-          <h2 className="mt-4 sm:mt-6 text-[30px] sm:text-[44px] lg:text-[52px] xl:text-[58px] font-black leading-[1] tracking-[-0.035em] text-balance max-w-[560px]">
-            Lleva la cuenta de tus clases.
-          </h2>
-          <p className="hidden sm:block mt-4 text-base lg:text-lg text-zinc-400 leading-relaxed max-w-[440px] text-balance">
-            Pasa lista, mira la asistencia de cada mes y comparte la hoja con quien la necesite.
-          </p>
-        </div>
-
-        <StyleList className="hidden sm:flex mt-10 lg:mt-0 px-10" />
-      </section>
-
-      {/* Formulario */}
-      <section className="relative flex-1 flex flex-col px-5 sm:px-10 py-7 sm:py-12 lg:py-10">
-        <div className="hidden lg:flex justify-end">
-          <button
-            onClick={onToggleTheme}
-            aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
-          >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col lg:justify-center w-full max-w-[400px] mx-auto lg:py-10">
-          <h1 className="text-[26px] sm:text-[32px] font-black tracking-[-0.025em] text-zinc-900 dark:text-white leading-tight">Entra en tu panel</h1>
-          <p className="hidden sm:block mt-2 text-[15px] text-zinc-500 dark:text-zinc-400">Con tu usuario y contraseña, o con tu cuenta de Google.</p>
-
-          <motion.form animate={shake} onSubmit={onSubmit} className="mt-5 sm:mt-8 flex flex-col gap-5" noValidate={false}>
-            <div>
-              <label htmlFor="login-user" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Usuario o correo</label>
-              <input
-                id="login-user"
-                type="text"
-                required
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                aria-invalid={loginError}
-                className={`${field} ${fieldBorder}`}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="login-pass" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Contraseña</label>
-              <div className="relative">
+            <motion.form animate={shake} onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
+              <motion.div variants={item}>
+                <label htmlFor="login-user" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Usuario o correo</label>
                 <input
-                  id="login-pass"
-                  type={showPassword ? "text" : "password"}
+                  id="login-user"
+                  type="text"
                   required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
                   aria-invalid={loginError}
-                  className={`${field} ${fieldBorder} pr-12`}
+                  className={`${field} ${fieldBorder}`}
                 />
+              </motion.div>
+
+              <motion.div variants={item}>
+                <label htmlFor="login-pass" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Contraseña</label>
+                <div className="relative">
+                  <input
+                    id="login-pass"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    aria-invalid={loginError}
+                    className={`${field} ${fieldBorder} pr-12`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+                  >
+                    {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                  </button>
+                </div>
+              </motion.div>
+
+              <AnimatePresence initial={false}>
+                {loginError && (
+                  <motion.p
+                    role="alert"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="overflow-hidden text-sm font-medium text-rose-600 dark:text-rose-400 flex gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    El usuario o la contraseña no son correctos. Revísalos e inténtalo de nuevo.
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
+              <motion.div variants={item}>
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(v => !v)}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="group relative overflow-hidden mt-1 h-12 w-full rounded-2xl bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-[0_10px_30px_-10px_rgba(244,63,94,0.7)] hover:shadow-[0_14px_36px_-10px_rgba(244,63,94,0.85)] active:scale-[0.98] transition-[transform,box-shadow] disabled:opacity-70 outline-none focus-visible:ring-4 focus-visible:ring-rose-500/30"
                 >
-                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                  {/* Destello que cruza el botón al pasar el ratón */}
+                  <span className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/35 to-transparent skew-x-[-20deg] -translate-x-full group-hover:translate-x-[420%] transition-transform duration-700 ease-out" aria-hidden />
+                  <span className="relative flex items-center gap-2">
+                    {isLoggingIn ? <><Loader2 className="w-4 h-4 animate-spin" /> Entrando…</> : "Entrar"}
+                  </span>
                 </button>
-              </div>
-            </div>
+              </motion.div>
+            </motion.form>
 
-            <AnimatePresence initial={false}>
-              {loginError && (
-                <motion.p
-                  role="alert"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="overflow-hidden text-sm font-medium text-rose-600 dark:text-rose-400 flex gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                  El usuario o la contraseña no son correctos. Revísalos e inténtalo de nuevo.
-                </motion.p>
-              )}
-            </AnimatePresence>
+            <motion.div variants={item} className="flex items-center gap-4 my-5" aria-hidden>
+              <span className="h-px flex-1 bg-zinc-200 dark:bg-white/10" />
+              <span className="text-sm text-zinc-400">o</span>
+              <span className="h-px flex-1 bg-zinc-200 dark:bg-white/10" />
+            </motion.div>
 
-            <button
-              type="submit"
-              disabled={isLoggingIn}
-              className="mt-1 h-12 w-full rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-[15px] font-bold flex items-center justify-center gap-2 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-60 outline-none focus-visible:ring-4 focus-visible:ring-rose-500/30"
-            >
-              {isLoggingIn ? <><Loader2 className="w-4 h-4 animate-spin" /> Entrando…</> : "Entrar"}
-            </button>
-          </motion.form>
+            <motion.div variants={item}>
+              <button
+                type="button"
+                onClick={onGoogle}
+                className="h-12 w-full rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-[15px] font-semibold text-zinc-800 dark:text-zinc-100 flex items-center justify-center gap-3 hover:bg-zinc-50 dark:hover:bg-white/[0.08] active:scale-[0.98] transition-[background-color,transform] outline-none focus-visible:ring-4 focus-visible:ring-rose-500/30"
+              >
+                <GoogleIcon /> Entrar con Google
+              </button>
+            </motion.div>
 
-          <div className="flex items-center gap-4 my-6" aria-hidden>
-            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-            <span className="text-sm text-zinc-400">o</span>
-            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-
-          <button
-            type="button"
-            onClick={onGoogle}
-            className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[15px] font-semibold text-zinc-800 dark:text-zinc-100 flex items-center justify-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/70 active:scale-[0.98] transition-[background-color,transform] outline-none focus-visible:ring-4 focus-visible:ring-rose-500/30"
-          >
-            <GoogleIcon /> Entrar con Google
-          </button>
-
-          <p className="mt-8 sm:mt-10 text-sm text-zinc-500 dark:text-zinc-500 leading-relaxed">
-            ¿No puedes entrar? Pide a quien administra SalsaNova que revise tu cuenta.
-          </p>
-        </div>
-      </section>
+            <motion.p variants={item} className="mt-6 text-[13px] text-zinc-500 leading-relaxed">
+              ¿No puedes entrar? Pide a quien administra SalsaNova que revise tu cuenta.
+            </motion.p>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };
