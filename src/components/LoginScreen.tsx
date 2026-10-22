@@ -37,20 +37,25 @@ const SoftSpotlight: React.FC = () => {
   );
 };
 
-// Logo de la escuela bajo el foco, con el reflejo de luz en el suelo
+// Logo de la escuela (blanco sobre transparente) directamente sobre el escenario,
+// bajo el foco y con el reflejo de luz en el suelo
 const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
   const reduce = useReducedMotion();
   return (
     <div className="relative flex flex-col items-center">
-      <motion.div
-        initial={reduce ? false : { scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full bg-black ring-1 ring-white/15 flex items-center justify-center shadow-[0_0_60px_-18px_rgba(244,63,94,0.4)]"
-      >
-        <img src={logoSrc} alt="Logo de SalsaNova" className="w-full h-full object-contain p-5 sm:p-6 lg:p-7" />
-      </motion.div>
-      <div className="w-56 sm:w-72 lg:w-80 h-6 sm:h-8 -mt-2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.14),transparent_70%)] blur-[6px]" aria-hidden />
+      <motion.img
+        src={logoSrc}
+        alt="Escuela de Baile SalsaNova"
+        draggable={false}
+        initial={reduce ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="w-[230px] sm:w-[320px] lg:w-[380px] xl:w-[420px] h-auto select-none drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
+      />
+      <div
+        className="w-[280px] sm:w-[360px] lg:w-[420px] h-5 sm:h-7 mt-2 sm:mt-3 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.32),transparent_70%)] blur-[6px]"
+        aria-hidden
+      />
     </div>
   );
 };
@@ -116,8 +121,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <SoftSpotlight />
         </div>
 
-        <div className="px-5 sm:px-10 lg:px-14 xl:px-20 flex items-center justify-between">
-          <Wordmark logoSrc={logoSrc} tone="stage" showLogo={false} />
+        <div className="px-5 sm:px-10 lg:px-14 xl:px-20 flex items-center justify-end lg:hidden">
           <button
             onClick={onToggleTheme}
             aria-label={isDarkMode ? "Usar tema claro" : "Usar tema oscuro"}
@@ -127,7 +131,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-10 lg:px-14 mt-4 sm:mt-8 lg:mt-0">
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-10 lg:px-14 mt-3 sm:mt-4 lg:mt-0">
           <StageLogo logoSrc={logoSrc} />
           <h2 className="mt-4 sm:mt-6 text-[30px] sm:text-[44px] lg:text-[52px] xl:text-[58px] font-black leading-[1] tracking-[-0.035em] text-balance max-w-[560px]">
             Lleva la cuenta de tus clases.
