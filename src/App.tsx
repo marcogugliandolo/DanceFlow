@@ -477,6 +477,7 @@ const ProfileView = ({
 };
 
 import { AttendanceView } from "./components/AttendanceView";
+import { LoginScreen } from "./components/LoginScreen";
 import {
   CalendarDays,
   CheckCircle2,
@@ -1721,158 +1722,19 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="relative min-h-[100dvh] overflow-x-hidden font-sans flex items-center justify-center p-4 selection:bg-rose-500/30">
-        {/* Fondo Decorativo Login */}
-        <div className="fixed inset-0 z-[-1] bg-zinc-50 dark:bg-[#09090b] overflow-hidden">
-          <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-rose-500/15 dark:bg-rose-500/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-fuchsia-600/15 dark:bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse duration-1000 delay-500" />
-        </div>
-
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="absolute top-6 right-6 w-10 h-10 z-[100] rounded-full flex items-center justify-center bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
-        >
-          {isDarkMode ? (
-            <Sun className="w-5 h-5" />
-          ) : (
-            <Moon className="w-5 h-5" />
-          )}
-        </button>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.2, type: "spring", bounce: 0.25 }}
-          className="w-full max-w-md"
-        >
-          <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-white/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-rose-500/10">
-            <div className="flex flex-col items-center mb-10">
-              <div className="relative flex items-center justify-center w-28 h-28 rounded-full bg-zinc-900 shadow-xl shadow-black/20 overflow-hidden mb-4 border-[3px] border-zinc-200 dark:border-zinc-800">
-                <img
-                  src={logoBase64}
-                  alt="SalsaNova Logo"
-                  className="w-full h-full object-contain p-4 z-20 relative"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    e.currentTarget.nextElementSibling?.classList.remove(
-                      "hidden",
-                    );
-                  }}
-                />
-                <div className="hidden absolute inset-0 z-10 flex flex-col items-center justify-center text-white">
-                  <span className="font-black text-4xl tracking-tighter leading-none">
-                    SSN
-                  </span>
-                  <span className="text-[7px] uppercase tracking-widest mt-1">
-                    SalsaNova
-                  </span>
-                </div>
-              </div>
-              <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white mt-2">
-                Salsa
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-fuchsia-500">
-                  Nova
-                </span>
-              </h1>
-              <p className="text-zinc-500 text-sm font-medium mt-2">
-                Escuela de Baile • Panel de Gestión
-              </p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="space-y-4">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-zinc-400" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Usuario"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
-                  />
-                </div>
-
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-zinc-400" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Contraseña"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-4 rounded-2xl text-base sm:text-sm border-none outline-none focus:ring-2 focus:ring-rose-500/50 transition-all font-medium placeholder:text-zinc-400 text-zinc-900 dark:text-zinc-100"
-                  />
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {loginError && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-3 bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl text-rose-600 dark:text-rose-400 text-sm font-medium flex items-center justify-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      Credenciales incorrectas
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="group w-full py-4 px-4 bg-gradient-to-r from-rose-500 to-fuchsia-600 text-white text-sm font-bold rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isLoggingIn ? "Entrando..." : "Entrar"}
-                {!isLoggingIn && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-              </button>
-
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-zinc-200 dark:border-zinc-800"></div>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white dark:bg-zinc-900 px-2 text-zinc-500 font-bold">O continuar con</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full py-4 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 text-sm font-bold rounded-2xl hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-sm"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                Google
-              </button>
-            </form>
-          </div>
-        </motion.div>
-      </div>
+      <LoginScreen
+        username={username}
+        setUsername={setUsername}
+        password={password}
+        setPassword={setPassword}
+        onSubmit={handleLogin}
+        isLoggingIn={isLoggingIn}
+        loginError={loginError}
+        onGoogle={handleGoogleLogin}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        logoSrc={logoBase64}
+      />
     );
   }
 
