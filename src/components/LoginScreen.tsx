@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from "motion/react";
-import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2, Sparkle } from "lucide-react";
+import { Eye, EyeOff, Sun, Moon, AlertCircle, Loader2 } from "lucide-react";
 
 type LoginScreenProps = {
   username: string;
@@ -17,29 +17,27 @@ type LoginScreenProps = {
 };
 
 // ---------- Escenario de baile ----------
-// Dos focos que barren suavemente el escenario y apuntan al logo de la escuela.
-const Spotlight: React.FC<{ side: "left" | "right"; color: string; delay: number }> = ({ side, color, delay }) => {
+// Un único foco suave que cae desde arriba sobre el logo. Solo aparece al cargar; no se mueve.
+const SoftSpotlight: React.FC = () => {
   const reduce = useReducedMotion();
-  const left = side === "left";
   return (
-    <motion.div
-      className="absolute top-[-8%] h-[95%] w-[60%] pointer-events-none"
-      style={{
-        [left ? "left" : "right"]: "-6%",
-        background: `linear-gradient(to bottom, ${color} 0%, ${color.replace(/[\d.]+\)$/, "0.12)")} 55%, transparent 85%)`,
-        clipPath: left ? "polygon(0 0, 18% 0, 100% 100%, 52% 100%)" : "polygon(82% 0, 100% 0, 48% 100%, 0 100%)",
-        filter: "blur(22px)",
-        transformOrigin: left ? "0% 0%" : "100% 0%",
-        mixBlendMode: "screen",
-      }}
-      initial={reduce ? false : { opacity: 0 }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: left ? [-3, 4, -3] : [3, -4, 3] }}
-      transition={reduce ? { duration: 0 } : { opacity: { duration: 1.2, delay }, rotate: { duration: 10, repeat: Infinity, ease: "easeInOut", delay } }}
-    />
+    <div className="absolute inset-x-0 top-0 h-[78%] flex justify-center pointer-events-none" aria-hidden>
+      <motion.div
+        className="h-full w-[460px] sm:w-[560px]"
+        style={{
+          background: "linear-gradient(to bottom, rgba(255,255,255,0.13), rgba(244,63,94,0.07) 60%, transparent 95%)",
+          clipPath: "polygon(43% 0, 57% 0, 100% 100%, 0 100%)",
+          filter: "blur(14px)",
+        }}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.4, ease: "easeOut" }}
+      />
+    </div>
   );
 };
 
-// Logo de la escuela bajo los focos, con el reflejo de luz en el suelo
+// Logo de la escuela bajo el foco, con el reflejo de luz en el suelo
 const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
   const reduce = useReducedMotion();
   return (
@@ -48,49 +46,28 @@ const StageLogo: React.FC<{ logoSrc: string }> = ({ logoSrc }) => {
         initial={reduce ? false : { scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full bg-black ring-1 ring-white/15 flex items-center justify-center shadow-[0_0_90px_-10px_rgba(217,70,239,0.55)]"
+        className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full bg-black ring-1 ring-white/15 flex items-center justify-center shadow-[0_0_60px_-18px_rgba(244,63,94,0.4)]"
       >
         <img src={logoSrc} alt="Logo de SalsaNova" className="w-full h-full object-contain p-5 sm:p-6 lg:p-7" />
       </motion.div>
-      <div className="w-56 sm:w-72 lg:w-80 h-6 sm:h-8 -mt-2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.45),transparent_70%)] blur-[6px]" aria-hidden />
+      <div className="w-56 sm:w-72 lg:w-80 h-6 sm:h-8 -mt-2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.14),transparent_70%)] blur-[6px]" aria-hidden />
     </div>
   );
 };
 
-// Cinta con los estilos de baile
-const DANCE_STYLES_A = ["Salsa", "Bachata", "Salón", "Kizomba", "Merengue"];
-const DANCE_STYLES_B = ["Pilates", "Danzas", "Cha-cha-chá", "Rueda de casino", "Tango"];
+// Estilos de baile de la escuela, en una línea discreta
+const DANCE_STYLES = ["Salsa", "Bachata", "Salón", "Kizomba", "Pilates"];
 
-const StyleMarquee: React.FC<{ items: string[]; reverse?: boolean; outline?: boolean; className?: string }> = ({ items, reverse, outline, className = "" }) => {
-  const reduce = useReducedMotion();
-  const row = (copy: number) => (
-    <div className="flex items-center shrink-0" aria-hidden={copy > 0}>
-      {items.map(s => (
-        <span key={`${copy}-${s}`} className="flex items-center">
-          <span
-            className="text-[34px] sm:text-[46px] lg:text-[56px] font-black tracking-[-0.035em] leading-none whitespace-nowrap px-4 sm:px-6"
-            style={outline ? { WebkitTextStroke: "1.5px rgba(255,255,255,0.4)", color: "transparent" } : undefined}
-          >
-            {s}
-          </span>
-          <Sparkle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${outline ? "text-fuchsia-500" : "text-rose-500"}`} fill="currentColor" />
-        </span>
-      ))}
-    </div>
-  );
-  return (
-    <div className={`overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)] ${className}`}>
-      <motion.div
-        className="flex w-max py-1"
-        animate={reduce ? undefined : { x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
-        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-      >
-        {row(0)}
-        {row(1)}
-      </motion.div>
-    </div>
-  );
-};
+const StyleList: React.FC<{ className?: string }> = ({ className = "" }) => (
+  <ul className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-medium text-zinc-500 ${className}`} aria-label="Estilos de baile">
+    {DANCE_STYLES.map((s, i) => (
+      <li key={s} className="flex items-center gap-3">
+        {i > 0 && <span className="w-1 h-1 rounded-full bg-rose-500/70" aria-hidden />}
+        {s}
+      </li>
+    ))}
+  </ul>
+);
 
 const Wordmark: React.FC<{ logoSrc: string; tone: "stage" | "auto"; showLogo?: boolean }> = ({ logoSrc, tone, showLogo = true }) => (
   <div className="flex items-center gap-3 min-h-10">
@@ -134,10 +111,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   return (
     <div className="min-h-[100dvh] flex flex-col lg:grid lg:grid-cols-[1.05fr_1fr] bg-white dark:bg-[#09090b] font-sans selection:bg-rose-500/30">
       {/* Escenario de baile: siempre oscuro. Panel izquierdo en ordenador; cabecera en tablet y móvil */}
-      <section className="relative isolate overflow-hidden flex flex-col bg-black text-white pt-5 sm:pt-8 lg:pt-12 pb-6 sm:pb-10 lg:pb-12 rounded-b-[28px] sm:rounded-b-[36px] lg:rounded-none border-b border-white/5 lg:border-b-0 lg:border-r">
+      <section className="relative isolate overflow-hidden flex flex-col bg-black text-white pt-5 sm:pt-8 lg:pt-12 pb-7 sm:pb-10 lg:pb-12 rounded-b-[28px] sm:rounded-b-[36px] lg:rounded-none border-b border-white/5 lg:border-b-0 lg:border-r">
         <div className="absolute inset-0 -z-10" aria-hidden>
-          <Spotlight side="left" color="rgba(244,63,94,0.55)" delay={0} />
-          <Spotlight side="right" color="rgba(192,38,211,0.55)" delay={0.4} />
+          <SoftSpotlight />
         </div>
 
         <div className="px-5 sm:px-10 lg:px-14 xl:px-20 flex items-center justify-between">
@@ -161,10 +137,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </p>
         </div>
 
-        <div className="mt-6 sm:mt-10 lg:mt-8 flex flex-col">
-          <StyleMarquee items={DANCE_STYLES_A} />
-          <StyleMarquee items={DANCE_STYLES_B} reverse outline className="hidden sm:block" />
-        </div>
+        <StyleList className="hidden sm:flex mt-10 lg:mt-0 px-10" />
       </section>
 
       {/* Formulario */}
