@@ -28,3 +28,35 @@
 }
 
 html, body { margin: 0; }
+
+/* ---------- Estilo B v2: paleta propia, claro y oscuro ---------- */
+.b2 {
+  --bg: #f2f1f4; --surface: #ffffff; --fill: #ecebf0; --hover: #f7f6f9;
+  --line: #e3e1e8; --line-strong: #cfcbd8;
+  --ink: #19161e; --muted: #6f6979; --faint: #a7a1b0; --on-ink: #ffffff;
+  --brand: #c8233c; --brand-hover: #b01e34; --on-brand: #ffffff;
+  --feature: #19161e; --on-feature: #ffffff; --feature-muted: rgba(255,255,255,0.58); --feature-track: rgba(255,255,255,0.12);
+  --salon: #c8233c; --salon-soft: #fbe9ec; --salon-ink: #a51c31;
+  --bachata: #6a3db8; --bachata-soft: #efe9fa; --bachata-ink: #56309a;
+  --danzas: #c98a00; --danzas-soft: #fbf2dc; --danzas-ink: #8a5e00;
+  --pilates: #0e7c7b; --pilates-soft: #e1f2f1; --pilates-ink: #0b6262;
+  --ok: #1f8a5b; --ok-soft: #e3f3ea; --warn: #9a6200; --warn-soft: #fbf0d9; --bad: #b4233a; --bad-soft: #fbe7ea;
+  --hatch-a: #ecebf0; --hatch-b: #f7f6f9;
+  background: var(--bg); color: var(--ink);
+}
+.b2.dark {
+  --bg: #131116; --surface: #1c1920; --fill: #2a2530; --hover: #24202a;
+  --line: #2e2934; --line-strong: #403948;
+  --ink: #f1eef4; --muted: #a39cad; --faint: #6d6676; --on-ink: #131116;
+  --brand: #f0566c; --brand-hover: #f36f82; --on-brand: #1a080c;
+  --feature: #231f28; --on-feature: #f1eef4; --feature-muted: rgba(241,238,244,0.55); --feature-track: rgba(255,255,255,0.08);
+  --salon: #f0566c; --salon-soft: rgba(240,86,108,0.14); --salon-ink: #f58a9a;
+  --bachata: #a585f0; --bachata-soft: rgba(165,133,240,0.15); --bachata-ink: #c2aaf6;
+  --danzas: #f2b53a; --danzas-soft: rgba(242,181,58,0.14); --danzas-ink: #f5c665;
+  --pilates: #3cc3be; --pilates-soft: rgba(60,195,190,0.14); --pilates-ink: #6fd6d2;
+  --ok: #4cc38a; --ok-soft: rgba(76,195,138,0.14); --warn: #f2b53a; --warn-soft: rgba(242,181,58,0.14); --bad: #f0566c; --bad-soft: rgba(240,86,108,0.14);
+  --hatch-a: #24202a; --hatch-b: #1c1920;
+}
+/* Cambio de tema suave (solo colores) */
+.b2, .b2 * { transition-property: background-color, border-color, color, fill, stroke; transition-duration: 300ms; transition-timing-function: ease; }
+@media (prefers-reduced-motion: reduce) { .b2, .b2 * { transition: none !important; } }

@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { motion, LayoutGroup } from "motion/react";
+import { motion, LayoutGroup, AnimatePresence } from "motion/react";
 import { Home, CheckCircle2, History, Users, ArrowUpRight, ChevronDown, Plus } from "lucide-react";
 import { kpis, incomeTrend, classes, pending, month, teacher } from "./data";
 import { CountUp, DancersMark, EASE } from "./shared";
+import { AsistenciaB, HistorialB, AlumnosB, PerfilB } from "./PagesB";
+import { HUE, pop } from "./themeB";
 
 // Propuesta B · "Ritmo": claro, expresivo y con color. Cada clase tiene su propio color
 // para reconocerla de un vistazo en toda la app. Tarjetas tipo "bento", tipografía con
@@ -14,19 +16,6 @@ const NAV = [
   { id: "historial", label: "Historial", icon: History },
   { id: "alumnos", label: "Alumnos", icon: Users },
 ];
-
-const HUE = {
-  rose: { bg: "bg-rose-50", ink: "text-rose-600", solid: "bg-rose-500", soft: "bg-rose-100", ring: "ring-rose-200" },
-  violet: { bg: "bg-violet-50", ink: "text-violet-600", solid: "bg-violet-500", soft: "bg-violet-100", ring: "ring-violet-200" },
-  amber: { bg: "bg-amber-50", ink: "text-amber-600", solid: "bg-amber-400", soft: "bg-amber-100", ring: "ring-amber-200" },
-  teal: { bg: "bg-teal-50", ink: "text-teal-600", solid: "bg-teal-500", soft: "bg-teal-100", ring: "ring-teal-200" },
-} as const;
-
-const pop = (i: number, base = 0) => ({
-  initial: { opacity: 0, y: 18, scale: 0.97 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  transition: { delay: base + i * 0.07, type: "spring" as const, stiffness: 260, damping: 20 },
-});
 
 const BigRing: React.FC<{ pct: number }> = ({ pct }) => {
   const size = 132, sw = 14, r = (size - sw) / 2, c = 2 * Math.PI * r;
@@ -50,48 +39,12 @@ const BigRing: React.FC<{ pct: number }> = ({ pct }) => {
   );
 };
 
-export const DirectionB: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
-  const [active, setActive] = useState("inicio");
+// Inicio (dashboard)
+const HomeB: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
   const maxIncome = Math.max(...incomeTrend.map(p => p.v));
-
   const card = "rounded-[28px] bg-white border border-[#ebe8f2]";
-
   return (
-    <div className="min-h-screen bg-[#f4f3f8] text-[#17131f] font-geist antialiased">
-      {/* Barra superior */}
-      <header className={`flex items-center justify-between ${mobile ? "px-4 pt-4" : "px-10 pt-6"}`}>
-        <motion.div {...pop(0)} className="flex items-center gap-2.5">
-          <span className="w-10 h-10 rounded-2xl bg-[#17131f] flex items-center justify-center"><DancersMark className="w-7 h-auto text-white" /></span>
-          <span className="font-bricolage text-xl font-bold tracking-tight">SalsaNova</span>
-        </motion.div>
-
-        {!mobile && (
-          <LayoutGroup id="b-nav">
-            <motion.nav {...pop(1)} className="flex items-center gap-1 p-1.5 rounded-full bg-white border border-[#ebe8f2]">
-              {NAV.map(n => {
-                const on = active === n.id;
-                return (
-                  <button key={n.id} onClick={() => setActive(n.id)} className={`relative h-10 px-5 rounded-full text-sm font-semibold flex items-center gap-2 transition-colors ${on ? "text-white" : "text-[#6b6478] hover:text-[#17131f]"}`}>
-                    {on && <motion.span layoutId="b-bubble" className="absolute inset-0 rounded-full bg-[#17131f]" transition={{ type: "spring", stiffness: 380, damping: 28 }} />}
-                    <n.icon className="relative w-4 h-4" /><span className="relative">{n.label}</span>
-                  </button>
-                );
-              })}
-            </motion.nav>
-          </LayoutGroup>
-        )}
-
-        <motion.div {...pop(2)} className="flex items-center gap-2">
-          {!mobile && (
-            <button className="h-10 px-4 rounded-full bg-white border border-[#ebe8f2] text-sm font-semibold flex items-center gap-1.5 hover:border-[#d9d4e6] transition-colors">
-              {month} <ChevronDown className="w-4 h-4 text-[#6b6478]" />
-            </button>
-          )}
-          <span className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-400 to-violet-500 text-white flex items-center justify-center text-sm font-bold">A</span>
-        </motion.div>
-      </header>
-
-      <main className={mobile ? "px-4 pt-6 pb-32" : "px-10 pt-10 pb-12 max-w-[1360px] mx-auto"}>
+    <>
         {/* Saludo */}
         <div className={`flex ${mobile ? "flex-col gap-4" : "items-end justify-between gap-6"}`}>
           <motion.div {...pop(0, 0.1)}>
@@ -228,6 +181,61 @@ export const DirectionB: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
             );
           })}
         </div>
+    </>
+  );
+};
+
+export const DirectionB: React.FC<{ mobile?: boolean; initialPage?: string; initialSub?: string }> = ({ mobile, initialPage, initialSub }) => {
+  const [active, setActive] = useState(initialPage ?? "inicio");
+
+  return (
+    <div className="min-h-screen bg-[#f4f3f8] text-[#17131f] font-geist antialiased">
+      {/* Barra superior */}
+      <header className={`flex items-center justify-between ${mobile ? "px-4 pt-4" : "px-10 pt-6"}`}>
+        <motion.div {...pop(0)} className="flex items-center gap-2.5">
+          <span className="w-10 h-10 rounded-2xl bg-[#17131f] flex items-center justify-center"><DancersMark className="w-7 h-auto text-white" /></span>
+          <span className="font-bricolage text-xl font-bold tracking-tight">SalsaNova</span>
+        </motion.div>
+
+        {!mobile && (
+          <LayoutGroup id="b-nav">
+            <motion.nav {...pop(1)} className="flex items-center gap-1 p-1.5 rounded-full bg-white border border-[#ebe8f2]">
+              {NAV.map(n => {
+                const on = active === n.id;
+                return (
+                  <button key={n.id} onClick={() => setActive(n.id)} className={`relative h-10 px-5 rounded-full text-sm font-semibold flex items-center gap-2 transition-colors ${on ? "text-white" : "text-[#6b6478] hover:text-[#17131f]"}`}>
+                    {on && <motion.span layoutId="b-bubble" className="absolute inset-0 rounded-full bg-[#17131f]" transition={{ type: "spring", stiffness: 380, damping: 28 }} />}
+                    <n.icon className="relative w-4 h-4" /><span className="relative">{n.label}</span>
+                  </button>
+                );
+              })}
+            </motion.nav>
+          </LayoutGroup>
+        )}
+
+        <motion.div {...pop(2)} className="flex items-center gap-2">
+          {!mobile && (
+            <button className="h-10 px-4 rounded-full bg-white border border-[#ebe8f2] text-sm font-semibold flex items-center gap-1.5 hover:border-[#d9d4e6] transition-colors">
+              {month} <ChevronDown className="w-4 h-4 text-[#6b6478]" />
+            </button>
+          )}
+          <button onClick={() => setActive("perfil")} aria-label="Perfil"
+            className={`w-10 h-10 rounded-full bg-gradient-to-br from-rose-400 to-violet-500 text-white flex items-center justify-center text-sm font-bold transition-shadow ${active === "perfil" ? "ring-4 ring-violet-200" : "hover:ring-4 hover:ring-white"}`}>A</button>
+        </motion.div>
+      </header>
+
+      <main className={mobile ? "px-4 pt-6 pb-32" : "px-10 pt-10 pb-12 max-w-[1360px] mx-auto"}>
+        <AnimatePresence mode="wait">
+          <motion.div key={active}
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.28, ease: EASE }}>
+            {active === "inicio" ? <HomeB mobile={mobile} />
+              : active === "asistencia" ? <AsistenciaB mobile={mobile} initialSub={initialSub} />
+              : active === "historial" ? <HistorialB mobile={mobile} />
+              : active === "alumnos" ? <AlumnosB mobile={mobile} />
+              : <PerfilB mobile={mobile} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Navegación flotante en móvil */}
