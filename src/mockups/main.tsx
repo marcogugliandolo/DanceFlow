@@ -7,6 +7,8 @@ import { DirectionB } from "./DirectionB";
 import { LoginA, LoginB } from "./Logins";
 import { AppB2 } from "./b2/AppB2";
 import { LoginB2 } from "./b2/LoginB2";
+import { AppB3 } from "./b3/AppB3";
+import { LoginB3 } from "./b3/LoginB3";
 
 // Página solo para enseñar las propuestas: /mockups.html?v=a | ?v=b  (&m=1 para móvil)
 const q = new URLSearchParams(location.search);
@@ -19,7 +21,8 @@ const dark = q.get("t") === "dark";
 
 createRoot(document.getElementById("root")!).render(
   <MotionConfig reducedMotion="user">
-    {v === "b2" ? (login ? <LoginB2 initialDark={dark} /> : <AppB2 mobile={mobile} initialPage={page} initialSub={sub} initialDark={dark} />)
+    {v === "b3" ? (login ? <LoginB3 initialDark={dark} mobile={mobile} /> : <AppB3 mobile={mobile} initialPage={page} initialSub={sub} initialDark={dark} />)
+      : v === "b2" ? (login ? <LoginB2 initialDark={dark} /> : <AppB2 mobile={mobile} initialPage={page} initialSub={sub} initialDark={dark} />)
       : login ? (v === "a" ? <LoginA /> : <LoginB mobile={mobile} />) : v === "a" ? <DirectionA mobile={mobile} /> : <DirectionB mobile={mobile} initialPage={page} initialSub={sub} />}
   </MotionConfig>
 );

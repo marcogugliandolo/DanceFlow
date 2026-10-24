@@ -42,6 +42,8 @@ html, body { margin: 0; }
   --pilates: #0e7c7b; --pilates-soft: #e1f2f1; --pilates-ink: #0b6262;
   --ok: #1f8a5b; --ok-soft: #e3f3ea; --warn: #9a6200; --warn-soft: #fbf0d9; --bad: #b4233a; --bad-soft: #fbe7ea;
   --hatch-a: #ecebf0; --hatch-b: #f7f6f9;
+  --brand-soft: #fbe9ec; --brand-shadow: 0 10px 24px -12px rgba(200,35,60,0.6);
+  --lift: 0 1px 2px rgba(25,22,30,0.04), 0 18px 40px -24px rgba(25,22,30,0.22);
   background: var(--bg); color: var(--ink);
 }
 .b2.dark {
@@ -56,7 +58,12 @@ html, body { margin: 0; }
   --pilates: #3cc3be; --pilates-soft: rgba(60,195,190,0.14); --pilates-ink: #6fd6d2;
   --ok: #4cc38a; --ok-soft: rgba(76,195,138,0.14); --warn: #f2b53a; --warn-soft: rgba(242,181,58,0.14); --bad: #f0566c; --bad-soft: rgba(240,86,108,0.14);
   --hatch-a: #24202a; --hatch-b: #1c1920;
+  --brand-soft: rgba(240,86,108,0.16); --brand-shadow: 0 10px 28px -14px rgba(240,86,108,0.55);
+  --lift: 0 0 0 1px rgba(255,255,255,0.02);
 }
+/* Estilo B3 (intermedio): sombras con el color de la marca y elevación suave */
+.shadow-brand { box-shadow: var(--brand-shadow); }
+.shadow-lift { box-shadow: var(--lift); }
 /* Cambio de tema suave (solo colores) */
 .b2, .b2 * { transition-property: background-color, border-color, color, fill, stroke; transition-duration: 300ms; transition-timing-function: ease; }
 @media (prefers-reduced-motion: reduce) { .b2, .b2 * { transition: none !important; } }
